@@ -55,11 +55,11 @@ export function Lobby() {
           <div className="hdr-row" style={{ gap: 12 }}>
             <Bee size={84} gavel="side" onDark />
             <div className="col">
-              <div className="display" style={{ fontSize: 30, lineHeight: 1, fontWeight: 800, color: 'var(--honey)' }}>
-                Mua đồ luxury
-              </div>
-              <div className="display" style={{ fontSize: 24, lineHeight: 1.1, fontWeight: 700 }}>
-                giá bình dân
+              <h1 className="display" style={{ fontSize: 40, lineHeight: 1, fontWeight: 800, color: 'var(--honey)' }}>
+                Đấu giá
+              </h1>
+              <div className="display" style={{ fontSize: 18, lineHeight: 1.2, fontWeight: 600 }}>
+                Mua đồ luxury giá bình dân
               </div>
             </div>
           </div>
@@ -309,7 +309,7 @@ function RoomCard({ cfg, now }: { cfg: RoomConfig; now: number }) {
             </div>
           ) : (
             <div className="small muted">
-              Tối đa {g.maxBidsFor(cfg.id)} lượt · {fmtVnd(cfg.stepVnd)}–{fmtVnd(cfg.maxSteps * cfg.stepVnd)}
+              Giá từ {fmtVnd(cfg.minVnd)} · không giới hạn lượt
             </div>
           )}
           {running && lowSeats && (

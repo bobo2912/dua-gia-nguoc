@@ -36,23 +36,28 @@ a { color: var(--honey-text); }
 h1, h2, h3 { margin: 0; }
 input, select { font-family: inherit; }
 
-/* ------- khung điện thoại ------- */
+/* ------- khung điện thoại: cao đúng bằng màn hình, chỉ vùng nội dung được cuộn ------- */
+html, body, #root { height: 100%; }
+body { overflow: hidden; overscroll-behavior: none; }
 .app {
   position: relative;
   max-width: 430px;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100%;
   margin: 0 auto;
   background: var(--cream);
   display: flex;
   flex-direction: column;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 @media (min-width: 520px) {
-  body { padding: 24px 0; }
-  .app { min-height: calc(100vh - 48px); border-radius: 28px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45); overflow: hidden; }
+  body { padding: 24px 0; box-sizing: border-box; }
+  .app { border-radius: 28px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45); }
 }
-.scroll { position: relative; flex: 1; overflow-y: auto; padding-bottom: 24px; }
+.screen { flex: 1; min-height: 0; display: flex; flex-direction: column; transition: opacity 0.15s ease; }
+.screen.fade-out { opacity: 0; }
+.screen.fade-in { animation: fadein 0.2s ease; }
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+.scroll { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding-bottom: 24px; }
 .display { font-family: var(--display); }
 
 /* ------- header tối ------- */
@@ -142,16 +147,17 @@ input, select { font-family: inherit; }
 
 /* ------- điều hướng dưới ------- */
 .nav {
-  position: sticky; bottom: 0; height: 72px; background: var(--card); border-top: 1.5px solid var(--line);
-  display: flex; align-items: stretch; z-index: 5; padding-bottom: env(safe-area-inset-bottom);
+  flex-shrink: 0; background: var(--card); border-top: 1.5px solid var(--line);
+  display: flex; align-items: stretch; z-index: 5;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .nav button {
-  flex: 1; border: none; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  flex: 1; min-width: 0; height: 64px; border: none; background: none; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); position: relative;
 }
 .nav button.on { color: var(--ink); font-weight: 700; }
 .dot-badge {
-  position: absolute; top: 10px; right: calc(50% - 20px); min-width: 18px; height: 18px; border-radius: 9px;
+  position: absolute; top: 6px; left: calc(50% + 6px); min-width: 18px; height: 18px; border-radius: 9px;
   background: var(--dup); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 4px;
 }
 
@@ -213,3 +219,7 @@ input, select { font-family: inherit; }
 .check { display: flex; align-items: center; gap: 10px; font-size: 14px; min-height: 44px; }
 .check input { width: 20px; height: 20px; accent-color: var(--ink); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

@@ -133,7 +133,7 @@ export function Win({ sessionId }: { sessionId: string }) {
         <button
           className="btn link"
           onClick={() => {
-            const text = `Mình vừa săn được ${pz.prize.name} với giá ${fmtVnd(pz.priceVnd)} trong "Mua đồ luxury giá bình dân"!`;
+            const text = `Mình vừa săn được ${pz.prize.name} với giá ${fmtVnd(pz.priceVnd)} trong app Đấu giá!`;
             const copy = () =>
               navigator.clipboard
                 ?.writeText(text)

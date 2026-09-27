@@ -51,7 +51,7 @@ import {
 } from './types';
 
 const STORAGE_KEY = 'mua-do-luxury-v1';
-const STATE_VERSION = 1;
+const STATE_VERSION = 2;
 
 export const roomCfg = (id: string): RoomConfig => ROOMS.find((r) => r.id === id)!;
 
@@ -68,33 +68,16 @@ export function nextRank(points: number): RankDef | null {
 }
 
 // ------------------------- Phân bố giá của thợ săn ảo -------------------------
-const cdfCache = new Map<string, number[]>();
-function priceCdf(cfg: RoomConfig): number[] {
-  const cached = cdfCache.get(cfg.id);
-  if (cached) return cached;
-  const scale = Math.max(1, cfg.maxSteps * cfg.bots.lowBias);
-  const w: number[] = [];
-  let sum = 0;
-  for (let k = 1; k <= cfg.maxSteps; k++) {
-    const v = Math.exp(-(k - 1) / scale);
-    sum += v;
-    w.push(sum);
-  }
-  const cdf = w.map((x) => x / sum);
-  cdfCache.set(cfg.id, cdf);
-  return cdf;
-}
+// Người chơi thật có xu hướng chọn số nhỏ và số "đẹp", nên vùng giá thấp rất dễ bị trùng.
+const ROUND_NUMBERS = [1, 2, 5, 9, 10, 11, 12, 15, 20, 21, 22, 25, 29, 30, 33, 39, 49, 50, 55, 66, 68, 69, 77, 79, 86, 88, 89, 99, 100, 101, 111, 123, 150, 168, 188, 199, 200, 222, 234, 250, 299, 333, 345, 368, 388, 399, 456, 500, 555, 666, 668, 686, 777, 789, 868, 888, 899, 999, 1000, 1234];
 function samplePrice(cfg: RoomConfig): number {
-  const cdf = priceCdf(cfg);
-  const r = Math.random();
-  let lo = 0;
-  let hi = cdf.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (cdf[mid] < r) lo = mid + 1;
-    else hi = mid;
+  const { typicalVnd, roundPref } = cfg.bots;
+  if (Math.random() < roundPref) {
+    const xs = ROUND_NUMBERS.filter((x) => x <= Math.max(typicalVnd * 8, 20) && x <= cfg.maxVnd);
+    if (xs.length) return pick(xs);
   }
-  return lo + 1;
+  const v = 1 + Math.floor(-Math.log(1 - Math.random()) * typicalVnd);
+  return Math.max(cfg.minVnd, Math.min(cfg.maxVnd, v));
 }
 
 // ------------------------- Phân tích trạng thái -------------------------
@@ -473,9 +456,9 @@ export class GameStore {
         this.emit({
           type: 'outbid',
           roomId: cfg.id,
-          priceVnd: prev.price * cfg.stepVnd,
+          priceVnd: prev.price,
           rivalTimes: times,
-          bestLeftVnd: mineUnique.length ? mineUnique[0].price * cfg.stepVnd : null,
+          bestLeftVnd: mineUnique.length ? mineUnique[0].price : null,
         });
       }
     }
@@ -548,7 +531,7 @@ export class GameStore {
     const sorted = [...s.bids].sort((a, b) => a.at - b.at);
     const lines = sorted.map((b) => {
       if (!anon.has(b.owner)) anon.set(b.owner, `TS-${String(anon.size + 1).padStart(4, '0')}`);
-      return `${anon.get(b.owner)},${b.price * cfg.stepVnd},${new Date(b.at).toISOString()}`;
+      return `${anon.get(b.owner)},${b.price},${new Date(b.at).toISOString()}`;
     });
     const csv = ['ma_tho_san,gia_vnd,thoi_diem', ...lines].join('\n');
     const hash = sha256(csv);
@@ -569,7 +552,7 @@ export class GameStore {
       const myUnique = my.filter((m) => m.status === 'unique');
       if (myUnique.length) {
         const lastWinPrice = winners[winners.length - 1].price;
-        nearMiss = { myPrice: myUnique[0].price * cfg.stepVnd, diff: (myUnique[0].price - lastWinPrice) * cfg.stepVnd };
+        nearMiss = { myPrice: myUnique[0].price, diff: (myUnique[0].price - lastWinPrice) };
       }
     }
     const result: SessionResult = {
@@ -589,14 +572,14 @@ export class GameStore {
     const now = s.endAt;
     const p = this.state.profile;
     for (const w of winners) {
-      this.state.hall.unshift({ id: uid('h'), at: now, name: w.owner === ME ? 'Bạn' : w.name, prize: w.prize.name, priceVnd: w.price * cfg.stepVnd, me: w.owner === ME });
+      this.state.hall.unshift({ id: uid('h'), at: now, name: w.owner === ME ? 'Bạn' : w.name, prize: w.prize.name, priceVnd: w.price, me: w.owner === ME });
       if (w.owner === ME) {
         p.prizes.unshift({
           id: uid('p'),
           sessionId: s.id,
           roomName: cfg.name,
           prize: w.prize,
-          priceVnd: w.price * cfg.stepVnd,
+          priceVnd: w.price,
           at: now,
           deadline: endOfDay(addDays(now, CLAIM_DAYS)),
           status: 'pending',
@@ -609,7 +592,7 @@ export class GameStore {
 
     rt.lastResult = { sessionId: s.id, no: s.no, endAt: s.endAt, result };
     if (s.myJoined) {
-      const item: HistoryItem = { sessionId: s.id, roomId: cfg.id, roomName: cfg.name, no: s.no, endAt: s.endAt, stepVnd: cfg.stepVnd, prizes: allPrizes, result };
+      const item: HistoryItem = { sessionId: s.id, roomId: cfg.id, roomName: cfg.name, no: s.no, endAt: s.endAt, stepVnd: 1, prizes: allPrizes, result };
       this.state.history.unshift(item);
       this.state.history = this.state.history.slice(0, 20);
       this.emit({ type: 'result', roomId: cfg.id, sessionId: s.id, won: iWon, roomName: cfg.name });
@@ -640,10 +623,16 @@ export class GameStore {
     return { ok: true };
   }
 
+  /** Số lượt tối đa mỗi phiên (Infinity = không giới hạn) */
   maxBidsFor(roomId: string): number {
-    const cfg = roomCfg(roomId);
-    const bonus = roomId === 'golden' && rankIndex(rankOf(this.state.profile.huntPoints).id) >= rankIndex('bac') ? 1 : 0;
-    return cfg.maxBidsPerUser + bonus;
+    const n = roomCfg(roomId).maxBidsPerUser;
+    return n > 0 ? n : Infinity;
+  }
+
+  /** Số lần Soi vùng giá mỗi phiên (hạng Bạc trở lên được thêm 1) */
+  scanQuota(roomId: string): number {
+    const bonus = rankIndex(rankOf(this.state.profile.huntPoints).id) >= rankIndex('bac') ? 1 : 0;
+    return roomCfg(roomId).tools.scan + bonus;
   }
 
   placeBid(roomId: string, priceSteps: number): { ok: boolean; error?: string } {
@@ -654,15 +643,15 @@ export class GameStore {
     if (now >= s.endAt) return { ok: false, error: 'Búa đã gõ. Giá không được ghi nhận, giọt mật được giữ nguyên.' };
     const entry = this.canEnter(roomId, now);
     if (!entry.ok) return { ok: false, error: entry.reason };
-    if (!Number.isInteger(priceSteps) || priceSteps < 1 || priceSteps > cfg.maxSteps) {
-      return { ok: false, error: `Giá phải từ ${fmtVnd(cfg.stepVnd)} đến ${fmtVnd(cfg.maxSteps * cfg.stepVnd)}` };
+    if (!Number.isInteger(priceSteps) || priceSteps < cfg.minVnd || priceSteps > cfg.maxVnd) {
+      return { ok: false, error: `Giá phải từ ${fmtVnd(cfg.minVnd)} đến ${fmtVnd(cfg.maxVnd)}` };
     }
     const mine = myBids(s);
     if (mine.length >= this.maxBidsFor(roomId)) return { ok: false, error: 'Bạn đã dùng hết lượt ra giá của phiên này' };
     if (mine.some((b) => b.price === priceSteps)) return { ok: false, error: 'Bạn đã ra giá này rồi' };
     if (this.balance(now) < 1) return { ok: false, error: 'Hết giọt mật. Giao dịch hoặc đổi điểm để có thêm.' };
 
-    this.consumeDrop(now, `Ra giá ${fmtVnd(priceSteps * cfg.stepVnd)} · Tổ ${cfg.name}`);
+    this.consumeDrop(now, `Ra giá ${fmtVnd(priceSteps)} · Tổ ${cfg.name}`);
     this.addBid(s, ME, priceSteps, now);
     if (!s.myJoined) {
       s.myJoined = true;
@@ -696,8 +685,10 @@ export class GameStore {
     const s = this.state.rooms[roomId].session;
     if (!s || !isRunning(s, now)) return { ok: false, error: 'Tổ không trong phiên' };
     if (isFrozen(s, now)) return { ok: false, error: 'Không dùng được trong giai đoạn đóng băng' };
-    if (s.toolsUsed.scan >= cfg.tools.scan) return { ok: false, error: 'Đã hết lượt Soi vùng giá của phiên này' };
-    if (to < from || from < 1 || to > cfg.maxSteps || to - from + 1 > 20) return { ok: false, error: 'Khoảng soi tối đa 20 mức giá' };
+    if (s.toolsUsed.scan >= this.scanQuota(roomId)) return { ok: false, error: 'Đã hết lượt Soi vùng giá của phiên này' };
+    from = Math.max(cfg.minVnd, from);
+    to = Math.min(cfg.maxVnd, to);
+    if (to < from || to - from + 1 > 101) return { ok: false, error: 'Khoảng soi tối đa 101 con số' };
     const counts = countPrices(s.bids);
     let empty = 0;
     for (let k = from; k <= to; k++) if (!counts.has(k)) empty++;
@@ -708,14 +699,7 @@ export class GameStore {
 
   /** Nhiệt kế: vùng (0 thấp, 1 trung, 2 cao) của giá đang dẫn đầu */
   thermoZones(roomId: string): [number, number][] {
-    const cfg = roomCfg(roomId);
-    const a = Math.round(cfg.maxSteps / 3);
-    const b = Math.round((cfg.maxSteps * 2) / 3);
-    return [
-      [1, a],
-      [a + 1, b],
-      [b + 1, cfg.maxSteps],
-    ];
+    return roomCfg(roomId).thermoZones;
   }
   useThermo(roomId: string): { ok: boolean; error?: string; zone?: number | null; at?: number } {
     const now = Date.now();

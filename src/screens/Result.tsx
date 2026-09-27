@@ -28,10 +28,10 @@ export function Result({ sessionId }: { sessionId: string }) {
   const winPrices = new Set(r.winners.map((w) => w.price));
   const myPrices = new Set(r.my.map((m) => m.price));
 
-  // Biểu đồ: các mức giá từ 1 đến sau mức quan trọng nhất một chút, tối đa 24 cột
-  const keyMax = Math.max(1, ...r.winners.map((w) => w.price), ...r.my.map((m) => m.price));
-  const upTo = Math.min(cfg.maxSteps, Math.max(10, keyMax + 3));
-  const start = Math.max(1, upTo - 23);
+  // Biểu đồ: 24 con số quanh giá thắng (hoặc quanh giá của bạn nếu không có người thắng)
+  const center = r.winners[0]?.price ?? r.my[0]?.price ?? r.counts[0]?.[0] ?? 1;
+  const start = Math.max(cfg.minVnd, center - 10);
+  const upTo = Math.min(cfg.maxVnd, start + 23);
   const countMap = new Map(r.counts);
   const cols = Array.from({ length: upTo - start + 1 }, (_, i) => start + i);
   const maxC = Math.max(1, ...cols.map((c) => countMap.get(c) ?? 0));
@@ -51,7 +51,7 @@ export function Result({ sessionId }: { sessionId: string }) {
     <div className="scroll">
       <header className="hdr" style={{ paddingBottom: 72 }}>
         <div className="hdr-row">
-          <button className="icon-btn" aria-label="Quay lại" onClick={() => nav.go({ name: 'history' })}>
+          <button className="icon-btn" aria-label="Quay lại" onClick={nav.back}>
             <IcBack />
           </button>
           <span className="small" style={{ opacity: 0.85 }}>
@@ -174,7 +174,7 @@ export function Result({ sessionId }: { sessionId: string }) {
           <div style={{ display: 'flex', gap: 3, fontSize: 9, color: 'var(--muted)', textAlign: 'center' }} aria-hidden="true">
             {cols.map((c) => (
               <span key={c} style={{ flex: 1, minWidth: 0, fontWeight: winPrices.has(c) ? 700 : 400, color: winPrices.has(c) ? 'var(--lead)' : undefined }}>
-                {c % 2 === 1 || cols.length <= 12 || winPrices.has(c) ? `${(c * step) / 1000}k` : ''}
+                {c % 3 === 0 || winPrices.has(c) ? c : ''}
               </span>
             ))}
           </div>
@@ -185,7 +185,7 @@ export function Result({ sessionId }: { sessionId: string }) {
             <Legend outline label="Giá của bạn" />
           </div>
           <div className="xs muted" style={{ lineHeight: 1.5 }}>
-            Số trên cột là số lượt ra giá ở mức đó. Chiều cao cột theo thang căn bậc hai để thấy rõ các mức ít người chọn.
+            Mỗi cột là một con số tiền (đồng), số trên cột là số lượt chọn con số đó. Biểu đồ chỉ hiện 24 con số quanh giá thắng. Chiều cao cột theo thang căn bậc hai để thấy rõ các mức ít người chọn.
           </div>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { isFrozen, isRunning, myBids, participantsOf, roomCfg, visibleStatuses } from '../engine/game';
 import type { BidStatus } from '../engine/types';
-import { fmtAgo, fmtClock, fmtVnd, randInt } from '../engine/util';
+import { fmtAgo, fmtClock, fmtNum, fmtVnd, randInt } from '../engine/util';
 import { useGame, useNav } from '../nav';
 import { Bee } from '../components/Bee';
 import { IcBack, IcBell, IcCircle, IcCrown, IcDrop, IcGavel, IcLock, IcSearch, IcSnow, IcThermo, IcX } from '../components/Icons';
@@ -29,7 +29,8 @@ export function Room({ roomId }: { roomId: string }) {
   const cfg = roomCfg(roomId);
   const s = g.state.rooms[roomId].session;
   const now = Date.now();
-  const [price, setPrice] = useState(() => randInt(2, Math.min(12, cfg.maxSteps)));
+  const [priceText, setPriceText] = useState(() => String(randInt(Math.ceil(cfg.bots.typicalVnd / 2), cfg.bots.typicalVnd * 2)));
+  const price = parseInt(priceText, 10) || 0;
   const [err, setErr] = useState('');
   const [flash, setFlash] = useState('');
 
@@ -44,7 +45,7 @@ export function Room({ roomId }: { roomId: string }) {
       <div className="scroll">
         <header className="hdr">
           <div className="hdr-row">
-            <button className="icon-btn" aria-label="Về sảnh" onClick={() => nav.go({ name: 'lobby' })}>
+            <button className="icon-btn" aria-label="Quay lại" onClick={nav.back}>
               <IcBack />
             </button>
             <span className="display grow" style={{ fontSize: 20, fontWeight: 700 }}>
@@ -71,13 +72,17 @@ export function Room({ roomId }: { roomId: string }) {
   const freezeTotal = cfg.freezeSec * 1000;
 
   const submit = () => {
+    if (!price) {
+      setErr('Nhập giá bạn muốn ra');
+      return;
+    }
     const r = g.placeBid(roomId, price);
     if (!r.ok) {
       setErr(r.error!);
       return;
     }
     setErr('');
-    setFlash(`Đã ra giá ${fmtVnd(price * cfg.stepVnd)}`);
+    setFlash(`Đã ra giá ${fmtVnd(price)}`);
     try {
       navigator.vibrate?.(30);
     } catch {
@@ -87,7 +92,7 @@ export function Room({ roomId }: { roomId: string }) {
 
   const setP = (v: number) => {
     setErr('');
-    setPrice(Math.max(1, Math.min(cfg.maxSteps, Math.round(v))));
+    setPriceText(String(Math.max(cfg.minVnd, Math.min(cfg.maxVnd, Math.round(v)))));
   };
 
   const canBid = running && entry.ok && mine.length < maxBids && bal > 0;
@@ -106,7 +111,7 @@ export function Room({ roomId }: { roomId: string }) {
       {/* ---------- Header ---------- */}
       <header className="hdr" style={frozen ? { borderRadius: 0 } : undefined}>
         <div className="hdr-row">
-          <button className="icon-btn" aria-label="Về sảnh" onClick={() => nav.go({ name: 'lobby' })}>
+          <button className="icon-btn" aria-label="Quay lại" onClick={nav.back}>
             <IcBack />
           </button>
           <div className="col grow">
@@ -206,7 +211,7 @@ export function Room({ roomId }: { roomId: string }) {
                 </div>
               ))}
               <div className="small muted" style={{ marginTop: 4 }}>
-                Khoảng giá {fmtVnd(cfg.stepVnd)}–{fmtVnd(cfg.maxSteps * cfg.stepVnd)} · Bước giá {fmtVnd(cfg.stepVnd)} · Tối đa {maxBids} lượt
+                Giá từ {fmtVnd(cfg.minVnd)} đến {fmtVnd(cfg.maxVnd)}, nhập lẻ từng đồng · {maxBids === Infinity ? 'Không giới hạn lượt ra giá' : `Tối đa ${maxBids} lượt`}
               </div>
               {allPrizes.length > 1 && <div className="small muted">{allPrizes.length} giá duy nhất thấp nhất lần lượt nhận quà.</div>}
             </div>
@@ -225,7 +230,7 @@ export function Room({ roomId }: { roomId: string }) {
                   Bạn đang dẫn đầu!
                 </div>
                 <div className="small">
-                  Giá <b>{fmtVnd(leading.bid.price * cfg.stepVnd)}</b> đang thấp nhất và duy nhất.
+                  Giá <b>{fmtVnd(leading.bid.price)}</b> đang thấp nhất và duy nhất.
                 </div>
                 {s.leadSince && (
                   <div className="small" style={{ fontWeight: 600 }}>
@@ -263,13 +268,13 @@ export function Room({ roomId }: { roomId: string }) {
               Giá của bạn
             </h2>
             <span className="small muted">
-              Đã dùng {mine.length}/{maxBids} lượt
+              Đã ra {mine.length} giá
             </span>
           </div>
           <div className="card flat" style={{ padding: 0, gap: 0 }}>
             {statuses.map(({ bid, status, frozen: fz }) => (
               <div key={bid.id} className="bidrow">
-                <span className={`bidprice ${status === 'dup' ? 'struck' : ''}`}>{fmtVnd(bid.price * cfg.stepVnd)}</span>
+                <span className={`bidprice ${status === 'dup' ? 'struck' : ''}`}>{fmtVnd(bid.price)}</span>
                 <StatusPill status={status} frozen={fz} />
               </div>
             ))}
@@ -289,22 +294,28 @@ export function Room({ roomId }: { roomId: string }) {
           <div className="row" style={{ gap: 12 }}>
             <button
               className="btn outline"
-              aria-label={`Giảm ${fmtVnd(cfg.stepVnd)}`}
+              aria-label="Giảm 1 đồng"
               style={{ width: 52, height: 52, padding: 0, fontSize: 26, background: 'var(--cream)', color: 'var(--ink)' }}
               onClick={() => setP(price - 1)}
             >
               −
             </button>
             <label className="grow" style={{ position: 'relative' }}>
-              <span className="visually-hidden">Giá (nghìn đồng)</span>
+              <span className="visually-hidden">Giá bạn muốn ra (đồng)</span>
               <input
                 id="bid-input"
-                type="number"
+                type="text"
                 inputMode="numeric"
-                min={1}
-                max={cfg.maxSteps}
-                value={price}
-                onChange={(e) => setP(Number(e.target.value) || 1)}
+                autoComplete="off"
+                placeholder="0"
+                value={priceText ? fmtNum(price) : ''}
+                onChange={(e) => {
+                  setErr('');
+                  setPriceText(e.target.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, 7));
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') submit();
+                }}
                 style={{
                   width: '100%',
                   height: 60,
@@ -316,16 +327,18 @@ export function Room({ roomId }: { roomId: string }) {
                   fontSize: 34,
                   fontWeight: 800,
                   color: 'var(--ink)',
-                  paddingRight: 70,
+                  paddingRight: 40,
+                  paddingLeft: 12,
+                  minWidth: 0,
                 }}
               />
               <span className="display" style={{ position: 'absolute', right: 14, top: 12, fontSize: 26, fontWeight: 800, color: 'var(--honey-text)', pointerEvents: 'none' }}>
-                .000đ
+                đ
               </span>
             </label>
             <button
               className="btn outline"
-              aria-label={`Tăng ${fmtVnd(cfg.stepVnd)}`}
+              aria-label="Tăng 1 đồng"
               style={{ width: 52, height: 52, padding: 0, fontSize: 26, background: 'var(--cream)', color: 'var(--ink)' }}
               onClick={() => setP(price + 1)}
             >
@@ -333,21 +346,21 @@ export function Room({ roomId }: { roomId: string }) {
             </button>
           </div>
           <div className="row" style={{ gap: 8 }}>
-            {[-10, -5, 5, 10].map((d) => (
+            {[-10, 10, 100].map((d) => (
               <button
                 key={d}
                 className="btn outline sm"
                 style={{ flex: 1, height: 40, border: '1.5px solid var(--line)', padding: 0, background: '#fff', color: 'var(--ink)' }}
                 onClick={() => setP(price + d)}
               >
-                {d > 0 ? '+' : ''}
-                {d}k
+                {d > 0 ? '+' : '−'}
+                {Math.abs(d)}đ
               </button>
             ))}
             <button
               className="btn outline sm"
               style={{ flex: 1.3, height: 40, border: '1.5px solid var(--line)', padding: 0, background: '#fff', color: 'var(--ink)' }}
-              onClick={() => setP(randInt(1, Math.min(cfg.maxSteps, 30)))}
+              onClick={() => setP(randInt(1, cfg.bots.typicalVnd * 3))}
             >
               Ngẫu nhiên
             </button>
@@ -365,7 +378,7 @@ export function Room({ roomId }: { roomId: string }) {
               <span style={{ fontWeight: 600 }}>{bidBlockReason}</span>
             ) : (
               <>
-                Giá đã ra không rút lại được. Còn {maxBids - mine.length} lượt trong phiên · ví còn {bal} giọt.
+                Giá đã ra không rút lại được. Mỗi lần ra giá tốn 1 giọt · ví còn {bal} giọt.
               </>
             )}
           </div>
@@ -394,14 +407,14 @@ export function Room({ roomId }: { roomId: string }) {
       {running && (
         <div className="section" style={{ flexDirection: 'row' }}>
           {(['scan', 'thermo'] as const).map((k) => {
-            const left = cfg.tools[k] - s.toolsUsed[k];
+            const left = (k === 'scan' ? g.scanQuota(roomId) : cfg.tools.thermo) - s.toolsUsed[k];
             return (
               <button
                 key={k}
                 className="card"
                 disabled={frozen || left <= 0}
                 style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: '10px 12px', boxShadow: 'none', textAlign: 'left', minHeight: 72, background: frozen ? 'transparent' : '#fff', color: 'inherit', borderColor: frozen ? 'rgba(255,246,224,0.3)' : 'var(--ink)' }}
-                onClick={() => nav.openTool(k, roomId)}
+                onClick={() => nav.openTool(k, roomId, price || cfg.bots.typicalVnd)}
               >
                 {k === 'scan' ? <IcSearch /> : <IcThermo />}
                 <span className="col">

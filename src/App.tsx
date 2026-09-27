@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type TouchEvent } from 'react';
 import type { EarnActionId } from './config';
 import { store } from './engine/game';
 import type { GameEvent } from './engine/types';
@@ -19,22 +19,69 @@ import { BreakModal } from './components/BreakModal';
 import { Toasts, type ToastItem } from './components/Toasts';
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>({ name: 'lobby' });
+  const [stack, setStack] = useState<Screen[]>([{ name: 'lobby' }]);
+  const screen = stack[stack.length - 1];
+  const [fade, setFade] = useState<'' | 'fade-out' | 'fade-in'>('');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [outbid, setOutbid] = useState<OutbidData | null>(null);
   const [bank, setBank] = useState<EarnActionId | null>(null);
   const [demo, setDemo] = useState(false);
-  const [tool, setTool] = useState<{ kind: 'scan' | 'thermo'; roomId: string } | null>(null);
+  const [tool, setTool] = useState<{ kind: 'scan' | 'thermo'; roomId: string; center: number } | null>(null);
   const [gavel, setGavel] = useState<{ sessionId: string; won: boolean } | null>(null);
   const [brk, setBrk] = useState(false);
   const screenRef = useRef(screen);
   screenRef.current = screen;
+  const stackRef = useRef(stack);
+  stackRef.current = stack;
+  const backing = useRef(false);
 
+  const TABS = ['lobby', 'wallet', 'rank', 'history'];
+  /** Đi tới màn mới. Các tab ở menu dưới không chồng lên nhau. */
   const go = useCallback((s: Screen) => {
-    setScreen(s);
-    window.scrollTo(0, 0);
-    document.querySelector('.scroll')?.scrollTo(0, 0);
+    setStack((st) => {
+      if (s.name === 'lobby') return [{ name: 'lobby' }];
+      if (TABS.includes(s.name)) return [{ name: 'lobby' }, s];
+      const top = st[st.length - 1];
+      if (JSON.stringify(top) === JSON.stringify(s)) return st;
+      return [...st, s].slice(-20);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** Quay lại: mờ dần màn hiện tại rồi hiện dần màn trước */
+  const back = useCallback(() => {
+    if (backing.current) return;
+    if (stackRef.current.length <= 1) return;
+    backing.current = true;
+    setFade('fade-out');
+    window.setTimeout(() => {
+      setStack((st) => (st.length > 1 ? st.slice(0, -1) : st));
+      setFade('fade-in');
+      window.setTimeout(() => {
+        setFade('');
+        backing.current = false;
+      }, 200);
+    }, 150);
+  }, []);
+
+  // Vuốt từ trái sang phải để quay lại
+  const touch = useRef<{ x: number; y: number; t: number; ok: boolean } | null>(null);
+  const overlayOpen = !!(outbid || bank || demo || tool || gavel || brk);
+  const onTouchStart = (e: TouchEvent) => {
+    const p = e.touches[0];
+    const target = e.target as HTMLElement;
+    const ok = !overlayOpen && !target.closest('input, textarea, select, .no-swipe');
+    touch.current = { x: p.clientX, y: p.clientY, t: Date.now(), ok };
+  };
+  const onTouchEnd = (e: TouchEvent) => {
+    const st = touch.current;
+    touch.current = null;
+    if (!st || !st.ok) return;
+    const p = e.changedTouches[0];
+    const dx = p.clientX - st.x;
+    const dy = Math.abs(p.clientY - st.y);
+    if (dx > 70 && dy < dx * 0.6 && Date.now() - st.t < 700) back();
+  };
 
   const pushToast = useCallback((t: Omit<ToastItem, 'id'>) => {
     const id = Math.random().toString(36).slice(2);
@@ -99,9 +146,10 @@ export default function App() {
   const nav: Nav = {
     screen,
     go,
+    back,
     openBank: setBank,
     openDemo: () => setDemo(true),
-    openTool: (kind, roomId) => setTool({ kind, roomId }),
+    openTool: (kind, roomId, center) => setTool({ kind, roomId, center }),
     toast: (text, tone = 'info') => pushToast({ text, tone }),
   };
 
@@ -132,8 +180,8 @@ export default function App() {
 
   return (
     <NavCtx.Provider value={nav}>
-      <div className="app">
-        {body}
+      <div className="app" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        <div className={`screen ${fade}`}>{body}</div>
         <Toasts items={toasts} onClose={(id) => setToasts((xs) => xs.filter((x) => x.id !== id))} />
         {outbid && (
           <OutbidSheet
@@ -147,7 +195,7 @@ export default function App() {
         )}
         {bank && <BankSheet actionId={bank} onClose={() => setBank(null)} />}
         {demo && <DemoPanel onClose={() => setDemo(false)} />}
-        {tool && <ToolSheet kind={tool.kind} roomId={tool.roomId} onClose={() => setTool(null)} />}
+        {tool && <ToolSheet kind={tool.kind} roomId={tool.roomId} center={tool.center} onClose={() => setTool(null)} />}
         {gavel && (
           <GavelOverlay
             won={gavel.won}

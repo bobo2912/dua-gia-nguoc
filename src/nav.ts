@@ -14,9 +14,11 @@ export type Screen =
 export interface Nav {
   screen: Screen;
   go: (s: Screen) => void;
+  /** Quay lại màn trước (có hiệu ứng mờ) */
+  back: () => void;
   openBank: (id: EarnActionId) => void;
   openDemo: () => void;
-  openTool: (kind: 'scan' | 'thermo', roomId: string) => void;
+  openTool: (kind: 'scan' | 'thermo', roomId: string, center: number) => void;
   toast: (text: string, tone?: 'good' | 'warn' | 'info') => void;
 }
 

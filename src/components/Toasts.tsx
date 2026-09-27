@@ -18,7 +18,7 @@ export function Toasts({ items, onClose }: { items: ToastItem[]; onClose: (id: s
             <IcGavel size={22} color="#1C1712" />
           </div>
           <div className="col grow" style={{ gap: 2 }}>
-            <span className="xs muted">Mua đồ luxury giá bình dân · vừa xong</span>
+            <span className="xs muted">Đấu giá · vừa xong</span>
             {t.title && <b style={{ fontSize: 14 }}>{t.title}</b>}
             <span style={{ fontSize: 13 }}>{t.text}</span>
           </div>
