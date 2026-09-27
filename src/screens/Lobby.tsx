@@ -1,12 +1,13 @@
 import { ROOMS, type RoomConfig } from '../config';
-import { isRunning, myBids, participantsOf, rankIndex, rankOf, nextRank } from '../engine/game';
+import { isFrozen, isRunning, myBids, participantsOf, rankIndex, rankOf, nextRank, visibleStatuses } from '../engine/game';
+import { priceRule } from '../config';
 import type { GameStore } from '../engine/game';
 import { fmtAgo, fmtClock, fmtVnd } from '../engine/util';
 import { useGame, useNav } from '../nav';
 import { versionLabel } from '../version';
 import { Bee } from '../components/Bee';
 import { BottomNav, PrizeImage } from '../components/common';
-import { HexPattern, HoneyJar, IcBack, IcBell, IcClock, IcDrop, IcFlame, IcGift, IcHex, IcLock, IcSettings, IcUsers } from '../components/Icons';
+import { HexPattern, HoneyJar, IcBack, IcBell, IcCircle, IcClock, IcCrown, IcDrop, IcFlame, IcGift, IcHex, IcLock, IcSettings, IcSnow, IcUsers, IcX } from '../components/Icons';
 
 function heat(g: GameStore, roomId: string, now: number): number {
   const s = g.state.rooms[roomId].session;
@@ -30,9 +31,11 @@ export function Lobby() {
   });
   const potValue = jackpots.reduce((s, j) => s + j.pot.reduce((a, b) => a + b.valueVnd, 0), 0);
 
+  const jackpotIds = new Set(jackpots.map((j) => j.cfg.id));
   const running: RoomConfig[] = [];
   const later: RoomConfig[] = [];
   for (const cfg of ROOMS) {
+    if (jackpotIds.has(cfg.id)) continue;
     const s = g.state.rooms[cfg.id].session;
     if (s && isRunning(s, now) && rankIndex(rank.id) >= rankIndex(cfg.minRank)) running.push(cfg);
     else later.push(cfg);
@@ -96,33 +99,34 @@ export function Lobby() {
           </div>
         )}
 
-        <div className="section">
-          <div className="card" style={{ background: 'var(--honey)', flexDirection: 'row', alignItems: 'center', boxShadow: '0 5px 0 var(--ink)', borderRadius: 22 }}>
-            <div className="col grow" style={{ gap: 4 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em' }}>HŨ MẬT JACKPOT</div>
-              {jackpots.length ? (
-                <>
-                  <div className="display" style={{ fontSize: 24, lineHeight: 1.1, fontWeight: 800 }}>
-                    Quà {fmtVnd(potValue)} đang dồn
-                  </div>
-                  {jackpots.map((j) => (
-                    <div key={j.cfg.id} className="small" style={{ fontWeight: 500 }}>
-                      Tổ {j.cfg.name}: {j.pot.map((x) => x.name.replace(' (dồn)', '')).join(', ')} · đã dồn {j.rolls} lần
-                    </div>
-                  ))}
-                </>
-              ) : (
-                <>
-                  <div className="display" style={{ fontSize: 22, lineHeight: 1.1, fontWeight: 800 }}>
-                    Hũ mật đang trống
-                  </div>
-                  <div className="small">Phiên không có giá duy nhất sẽ dồn quà vào đây.</div>
-                </>
-              )}
+        {jackpots.length > 0 ? (
+          <div className="section">
+            <div className="row" style={{ gap: 10 }}>
+              <div className="pulse" style={{ display: 'flex' }}>
+                <HoneyJar size={34} />
+              </div>
+              <div className="col">
+                <h2 className="section-title">Hũ mật đang dồn</h2>
+                <span className="small" style={{ fontWeight: 700, color: 'var(--honey-text)' }}>
+                  Tổng quà {fmtVnd(potValue)} đang chờ người săn
+                </span>
+              </div>
             </div>
-            <HoneyJar />
+            {jackpots.map((j) => (
+              <RoomCard key={j.cfg.id} cfg={j.cfg} now={now} jackpot={{ pot: j.pot, rolls: j.rolls }} />
+            ))}
           </div>
-        </div>
+        ) : (
+          <div className="section">
+            <div className="card flat" style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, background: '#FBF3DD' }}>
+              <HoneyJar size={40} />
+              <div className="col grow" style={{ gap: 2 }}>
+                <b style={{ fontSize: 15 }}>Hũ mật đang trống</b>
+                <span className="small muted">Phiên nào không có giá duy nhất sẽ dồn quà vào đây. Khi có, tổ đó được đưa lên đầu sảnh.</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="section">
           <div className="row" style={{ gap: 8 }}>
@@ -185,7 +189,27 @@ export function Lobby() {
   );
 }
 
-function RoomCard({ cfg, now }: { cfg: RoomConfig; now: number }) {
+function RoomCard({ cfg, now, jackpot }: { cfg: RoomConfig; now: number; jackpot?: { pot: { name: string; valueVnd: number }[]; rolls: number } }) {
+  const card = <RoomCardInner cfg={cfg} now={now} />;
+  if (!jackpot) return card;
+  const total = jackpot.pot.reduce((a, b) => a + b.valueVnd, 0);
+  return (
+    <div className="jackpot-frame">
+      <div className="row" style={{ padding: '10px 14px 8px', gap: 10, color: 'var(--cream)' }}>
+        <HoneyJar size={30} />
+        <div className="col grow" style={{ gap: 1 }}>
+          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', color: 'var(--honey)' }}>HŨ MẬT JACKPOT · DỒN {jackpot.rolls} LẦN</span>
+          <span className="display" style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.15 }}>
+            Thêm {fmtVnd(total)} quà: {jackpot.pot.map((x) => x.name.replace(' (dồn)', '')).join(', ')}
+          </span>
+        </div>
+      </div>
+      {card}
+    </div>
+  );
+}
+
+function RoomCardInner({ cfg, now }: { cfg: RoomConfig; now: number }) {
   const g = useGame();
   const nav = useNav();
   const rt = g.state.rooms[cfg.id];
@@ -267,6 +291,7 @@ function RoomCard({ cfg, now }: { cfg: RoomConfig; now: number }) {
   const entry = g.canEnter(cfg.id, now);
   const h = heat(g, cfg.id, now);
   const upcomingSecret = cfg.secret && !running;
+  const rule = priceRule(cfg);
 
   return (
     <div className="card" style={upcomingSecret ? { borderColor: 'var(--dup)', boxShadow: '0 4px 0 var(--dup)' } : undefined}>
@@ -280,7 +305,7 @@ function RoomCard({ cfg, now }: { cfg: RoomConfig; now: number }) {
               {Array.from({ length: h }, (_, i) => (
                 <IcFlame key={i} />
               ))}
-              {h === 3 ? 'Rất sôi động' : h === 2 ? 'Sôi động' : 'Đang ấm'}
+              {h >= 2 ? 'Sôi động' : 'Đang ấm'}
             </span>
           )
         ) : (
@@ -295,11 +320,14 @@ function RoomCard({ cfg, now }: { cfg: RoomConfig; now: number }) {
           <div className="display" style={{ fontSize: 20, lineHeight: 1.15, fontWeight: 700 }}>
             {prizeName}
           </div>
-          {s.jackpot.length > 0 && (
-            <div className="small" style={{ fontWeight: 700, color: 'var(--honey-text)' }}>
-              + Hũ mật: {s.jackpot.map((j) => j.name.replace(' (dồn)', '')).join(', ')}
-            </div>
-          )}
+          <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            <span className="info-chip">
+              Trị giá <b>{fmtVnd(rule.prizeValue)}</b>
+            </span>
+            <span className="info-chip">
+              Bước giá <b>{fmtVnd(rule.step)}</b>
+            </span>
+          </div>
           {running ? (
             <div className="row small muted" style={{ gap: 12, fontWeight: 500, flexWrap: 'wrap' }}>
               <span className="row" style={{ gap: 4 }}>
@@ -313,7 +341,7 @@ function RoomCard({ cfg, now }: { cfg: RoomConfig; now: number }) {
             </div>
           ) : (
             <div className="small muted">
-              Giá từ {fmtVnd(cfg.minVnd)} · không giới hạn lượt
+              Giá từ {fmtVnd(rule.min)} đến {fmtVnd(rule.max)} · không giới hạn lượt
             </div>
           )}
           {running && lowSeats && (
@@ -326,13 +354,9 @@ function RoomCard({ cfg, now }: { cfg: RoomConfig; now: number }) {
               </div>
             </>
           )}
-          {mine.length > 0 && (
-            <div className="small" style={{ fontWeight: 700, color: 'var(--lead)' }}>
-              Bạn đã ra {mine.length} giá
-            </div>
-          )}
         </div>
       </div>
+      {mine.length > 0 && <MyStatus roomId={cfg.id} now={now} />}
       {running ? (
         entry.ok ? (
           <button className="btn" onClick={() => nav.go({ name: 'room', roomId: cfg.id })}>
@@ -357,6 +381,45 @@ function RoomCard({ cfg, now }: { cfg: RoomConfig; now: number }) {
           {p.reminders.includes(cfg.id) ? 'Đã đặt nhắc' : 'Nhắc tôi khi mở'}
         </button>
       )}
+    </div>
+  );
+}
+
+/** Trạng thái của người chơi trong tổ, hiện ngay trên thẻ ở sảnh */
+function MyStatus({ roomId, now }: { roomId: string; now: number }) {
+  const g = useGame();
+  const s = g.state.rooms[roomId].session!;
+  const st = visibleStatuses(s, now);
+  const frozen = isFrozen(s, now);
+  const lead = st.find((x) => x.status === 'leading');
+  const uniq = st.filter((x) => x.status === 'unique');
+  const n = st.length;
+  let tone: 'lead' | 'unique' | 'dup' | 'frozen';
+  let text: string;
+  if (frozen) {
+    tone = 'frozen';
+    text = `Đang đóng băng · ${lead ? `bạn dẫn đầu với ${fmtVnd(lead.bid.price)} lúc đóng băng` : 'chờ gõ búa'}`;
+  } else if (lead) {
+    tone = 'lead';
+    text = `Bạn đang dẫn đầu · ${fmtVnd(lead.bid.price)} thấp nhất và duy nhất`;
+  } else if (uniq.length) {
+    tone = 'unique';
+    text = `Có ${uniq.length} giá duy nhất nhưng chưa thấp nhất`;
+  } else {
+    tone = 'dup';
+    text = n === 1 ? 'Giá của bạn đang bị trùng' : `Cả ${n} giá của bạn đều bị trùng`;
+  }
+  const colors = {
+    lead: { bg: 'var(--lead)', fg: '#fff' },
+    unique: { bg: 'var(--honey-soft)', fg: 'var(--honey-text-strong)' },
+    dup: { bg: 'var(--dup-soft)', fg: 'var(--dup-text)' },
+    frozen: { bg: '#E3F1FB', fg: '#1D5B80' },
+  }[tone];
+  return (
+    <div className="row" style={{ background: colors.bg, color: colors.fg, borderRadius: 12, padding: '8px 12px', gap: 8, fontSize: 13, fontWeight: 700 }}>
+      {tone === 'lead' ? <IcCrown size={16} /> : tone === 'dup' ? <IcX size={16} /> : tone === 'frozen' ? <IcSnow size={16} /> : <IcCircle size={16} />}
+      <span className="grow">{text}</span>
+      <span style={{ fontWeight: 600, opacity: 0.85 }}>{n} giá</span>
     </div>
   );
 }

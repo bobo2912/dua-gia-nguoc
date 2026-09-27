@@ -20,9 +20,13 @@ import { Toasts, type ToastItem } from './components/Toasts';
 import { applyUpdate, checkForUpdate, type UpdateInfo } from './version';
 
 export default function App() {
-  const [stack, setStack] = useState<Screen[]>([{ name: 'lobby' }]);
-  const screen = stack[stack.length - 1];
-  const [fade, setFade] = useState<'' | 'fade-out' | 'fade-in'>('');
+  // Ngăn xếp màn hình: mỗi mục có id riêng để React giữ nguyên màn khi lướt quay lại
+  type Entry = { id: number; s: Screen };
+  const nextId = useRef(1);
+  const [stack, setStack] = useState<Entry[]>([{ id: 0, s: { name: 'lobby' } }]);
+  const screen = stack[stack.length - 1].s;
+  const [enterId, setEnterId] = useState<number | null>(null);
+  const [showUnder, setShowUnder] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [outbid, setOutbid] = useState<OutbidData | null>(null);
   const [bank, setBank] = useState<EarnActionId | null>(null);
@@ -35,54 +39,117 @@ export default function App() {
   screenRef.current = screen;
   const stackRef = useRef(stack);
   stackRef.current = stack;
-  const backing = useRef(false);
+  const animating = useRef(false);
+  const topRef = useRef<HTMLDivElement | null>(null);
+  const underRef = useRef<HTMLDivElement | null>(null);
 
   const TABS = ['lobby', 'wallet', 'rank', 'history'];
-  /** Đi tới màn mới. Các tab ở menu dưới không chồng lên nhau. */
+  /** Đi tới màn mới (lướt vào từ bên phải). Các tab ở menu dưới không chồng lên nhau. */
   const go = useCallback((s: Screen) => {
-    setStack((st) => {
-      if (s.name === 'lobby') return [{ name: 'lobby' }];
-      if (TABS.includes(s.name)) return [{ name: 'lobby' }, s];
-      const top = st[st.length - 1];
-      if (JSON.stringify(top) === JSON.stringify(s)) return st;
-      return [...st, s].slice(-20);
+    const st = stackRef.current;
+    if (s.name === 'lobby') {
+      setStack([{ id: 0, s }]);
+      return;
+    }
+    if (TABS.includes(s.name)) {
+      setStack([{ id: 0, s: { name: 'lobby' } }, { id: nextId.current++, s }]);
+      return;
+    }
+    if (JSON.stringify(st[st.length - 1].s) === JSON.stringify(s)) return;
+    const id = nextId.current++;
+    setStack([...st, { id, s }].slice(-20));
+    setEnterId(id);
+    window.setTimeout(() => setEnterId((x) => (x === id ? null : x)), 300);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** Dịch màn trên cùng sang phải x px; màn bên dưới trượt theo kiểu thị sai */
+  const setX = (x: number, anim: boolean) => {
+    const t = topRef.current;
+    const u = underRef.current;
+    const w = t?.offsetWidth ?? 390;
+    const tr = anim ? 'transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none';
+    if (t) {
+      t.style.transition = tr;
+      t.style.transform = x > 0 ? `translateX(${x}px)` : '';
+    }
+    if (u) {
+      u.style.transition = tr;
+      u.style.transform = `translateX(${-0.3 * (w - x)}px)`;
+    }
+  };
+  const finishBack = () => {
+    setStack((st) => (st.length > 1 ? st.slice(0, -1) : st));
+    setShowUnder(false);
+    requestAnimationFrame(() => {
+      if (topRef.current) {
+        topRef.current.style.transition = 'none';
+        topRef.current.style.transform = '';
+      }
+      animating.current = false;
+    });
+  };
+
+  /** Quay lại: màn hiện tại lướt sang phải, màn trước hiện ra */
+  const back = useCallback(() => {
+    if (animating.current || stackRef.current.length <= 1) return;
+    animating.current = true;
+    setShowUnder(true);
+    requestAnimationFrame(() => {
+      setX(0, false);
+      requestAnimationFrame(() => {
+        setX(topRef.current?.offsetWidth ?? 390, true);
+        window.setTimeout(finishBack, 250);
+      });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** Quay lại: mờ dần màn hiện tại rồi hiện dần màn trước */
-  const back = useCallback(() => {
-    if (backing.current) return;
-    if (stackRef.current.length <= 1) return;
-    backing.current = true;
-    setFade('fade-out');
-    window.setTimeout(() => {
-      setStack((st) => (st.length > 1 ? st.slice(0, -1) : st));
-      setFade('fade-in');
-      window.setTimeout(() => {
-        setFade('');
-        backing.current = false;
-      }, 200);
-    }, 150);
-  }, []);
-
-  // Vuốt từ trái sang phải để quay lại
-  const touch = useRef<{ x: number; y: number; t: number; ok: boolean } | null>(null);
+  // Vuốt từ trái sang phải để quay lại: màn hình chạy theo ngón tay
+  const touch = useRef<{ x: number; y: number; t: number; ok: boolean; drag: boolean; dx: number } | null>(null);
   const overlayOpen = !!(outbid || bank || demo || tool || gavel || brk);
   const onTouchStart = (e: TouchEvent) => {
     const p = e.touches[0];
     const target = e.target as HTMLElement;
-    const ok = !overlayOpen && !target.closest('input, textarea, select, .no-swipe');
-    touch.current = { x: p.clientX, y: p.clientY, t: Date.now(), ok };
+    const ok = !overlayOpen && !animating.current && stackRef.current.length > 1 && !target.closest('input, textarea, select, .no-swipe');
+    touch.current = { x: p.clientX, y: p.clientY, t: Date.now(), ok, drag: false, dx: 0 };
   };
-  const onTouchEnd = (e: TouchEvent) => {
+  const onTouchMove = (e: TouchEvent) => {
     const st = touch.current;
-    touch.current = null;
     if (!st || !st.ok) return;
-    const p = e.changedTouches[0];
+    const p = e.touches[0];
     const dx = p.clientX - st.x;
     const dy = Math.abs(p.clientY - st.y);
-    if (dx > 70 && dy < dx * 0.6 && Date.now() - st.t < 700) back();
+    if (!st.drag) {
+      if (dy > 12 && dy > Math.abs(dx)) {
+        st.ok = false; // đang cuộn dọc
+        return;
+      }
+      if (dx > 12 && dx > dy * 1.2) {
+        st.drag = true;
+        animating.current = true;
+        setShowUnder(true);
+      } else return;
+    }
+    st.dx = Math.max(0, dx);
+    setX(st.dx, false);
+  };
+  const onTouchEnd = () => {
+    const st = touch.current;
+    touch.current = null;
+    if (!st || !st.drag) return;
+    const w = topRef.current?.offsetWidth ?? 390;
+    const v = st.dx / Math.max(1, Date.now() - st.t);
+    if (st.dx > w * 0.3 || v > 0.6) {
+      setX(w, true);
+      window.setTimeout(finishBack, 250);
+    } else {
+      setX(0, true);
+      window.setTimeout(() => {
+        setShowUnder(false);
+        animating.current = false;
+      }, 250);
+    }
   };
 
   const pushToast = useCallback((t: Omit<ToastItem, 'id'>) => {
@@ -181,35 +248,44 @@ export default function App() {
     toast: (text, tone = 'info') => pushToast({ text, tone }),
   };
 
-  let body;
-  switch (screen.name) {
-    case 'lobby':
-      body = <Lobby />;
-      break;
-    case 'room':
-      body = <Room key={screen.roomId} roomId={screen.roomId} />;
-      break;
-    case 'result':
-      body = <Result sessionId={screen.sessionId} />;
-      break;
-    case 'win':
-      body = <Win sessionId={screen.sessionId} />;
-      break;
-    case 'wallet':
-      body = <Wallet />;
-      break;
-    case 'rank':
-      body = <Rank />;
-      break;
-    case 'history':
-      body = <History />;
-      break;
-  }
+  const renderScreen = (sc: Screen) => {
+    switch (sc.name) {
+      case 'lobby':
+        return <Lobby />;
+      case 'room':
+        return <Room key={sc.roomId} roomId={sc.roomId} />;
+      case 'result':
+        return <Result sessionId={sc.sessionId} />;
+      case 'win':
+        return <Win sessionId={sc.sessionId} />;
+      case 'wallet':
+        return <Wallet />;
+      case 'rank':
+        return <Rank />;
+      case 'history':
+        return <History />;
+    }
+  };
+  const visible = stack.filter((_, i) => i === stack.length - 1 || (showUnder && i === stack.length - 2));
 
   return (
     <NavCtx.Provider value={nav}>
-      <div className="app" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        <div className={`screen ${fade}`}>{body}</div>
+      <div className="app">
+        <div className="stage" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
+          {visible.map((en) => {
+            const isTop = en.id === stack[stack.length - 1].id;
+            return (
+              <div
+                key={en.id}
+                ref={isTop ? topRef : underRef}
+                className={`layer ${isTop ? 'top' : 'under'} ${isTop && en.id === enterId ? 'slide-in' : ''}`}
+                aria-hidden={!isTop}
+              >
+                {renderScreen(en.s)}
+              </div>
+            );
+          })}
+        </div>
         <Toasts items={toasts} onClose={(id) => setToasts((xs) => xs.filter((x) => x.id !== id))} />
         {outbid && (
           <OutbidSheet

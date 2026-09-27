@@ -40,12 +40,13 @@ input, select { font-family: inherit; }
 html, body, #root { height: 100%; }
 body { overflow: hidden; overscroll-behavior: none; }
 .app {
-  /* Cố định theo 4 cạnh màn hình: tránh lỗi chiều cao 100% trên iPhone khi mở từ màn hình chính */
+  /* Cố định theo 4 cạnh màn hình. Chiều cao thật được JS đặt vào --app-h (xem main.tsx) */
   position: fixed;
   top: 0;
   bottom: 0;
   left: 0;
   right: 0;
+  height: var(--app-h, auto);
   max-width: 430px;
   margin: 0 auto;
   background: var(--cream);
@@ -56,10 +57,13 @@ body { overflow: hidden; overscroll-behavior: none; }
 @media (min-width: 520px) {
   .app { top: 24px; bottom: 24px; border-radius: 28px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45); }
 }
-.screen { flex: 1; min-height: 0; display: flex; flex-direction: column; transition: opacity 0.15s ease; }
-.screen.fade-out { opacity: 0; }
-.screen.fade-in { animation: fadein 0.2s ease; }
-@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+.stage { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: pan-y; }
+.layer { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--cream); will-change: transform; }
+.layer.top { z-index: 2; box-shadow: -12px 0 24px rgba(0, 0, 0, 0.18); }
+.layer.under { z-index: 1; }
+.layer.under::after { content: ''; position: absolute; inset: 0; background: rgba(28, 23, 18, 0.12); pointer-events: none; }
+.layer.slide-in { animation: slidein 0.26s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes slidein { from { transform: translateX(100%); } to { transform: translateX(0); } }
 .scroll { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding-bottom: 24px; }
 .display { font-family: var(--display); }
 
@@ -100,7 +104,7 @@ body { overflow: hidden; overscroll-behavior: none; }
 .card.flat { box-shadow: none; border: 1.5px solid var(--line); }
 .badge {
   align-self: flex-start; padding: 4px 10px; border-radius: 999px; background: var(--ink);
-  color: var(--honey); font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+  color: var(--honey); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; white-space: nowrap;
 }
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
@@ -185,7 +189,7 @@ body { overflow: hidden; overscroll-behavior: none; }
 @keyframes pop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 /* ------- toast (thay cho push) ------- */
-.toasts { position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); left: 0; right: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.toasts { position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); left: 0; right: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
 .toast {
   pointer-events: auto; width: calc(100% - 24px); max-width: 406px; background: var(--card); border-radius: 18px;
   padding: 12px 14px; display: flex; gap: 12px; align-items: center; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
@@ -236,3 +240,22 @@ body { overflow: hidden; overscroll-behavior: none; }
   display: flex; align-items: center; gap: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); animation: pop 0.25s ease;
 }
 .version-tag { text-align: center; font-size: 12px; color: var(--muted); padding: 16px 0 0; }
+
+/* Trên điện thoại: nếu còn khe hở do trình duyệt tính sai chiều cao,
+   nửa trên tô màu tối (khớp header), nửa dưới tô trắng (khớp menu) */
+@media (max-width: 519px) {
+  html, body { background: linear-gradient(to bottom, #1c1712 50%, #ffffff 50%); }
+}
+/* App mở từ màn hình chính (iPhone): dùng chiều cao toàn màn hình */
+html.standalone .app { bottom: auto; height: var(--app-h, 100vh); }
+
+/* ------- Hũ mật jackpot nổi bật ------- */
+.jackpot-frame {
+  background: var(--ink); border-radius: 24px; padding: 0 6px 6px; position: relative;
+  box-shadow: 0 0 0 3px var(--honey), 0 6px 0 3px var(--honey-deep), 0 0 26px rgba(245, 179, 1, 0.55);
+  animation: glow 2.2s ease-in-out infinite;
+}
+.jackpot-frame > .card { box-shadow: none; border-color: var(--honey); }
+@keyframes glow { 50% { box-shadow: 0 0 0 3px var(--honey), 0 6px 0 3px var(--honey-deep), 0 0 38px rgba(245, 179, 1, 0.85); } }
+.info-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 8px; background: #F6EEDA; font-size: 12px; color: var(--muted); }
+.info-chip b { color: var(--ink); }

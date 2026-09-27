@@ -1,3 +1,4 @@
+import { priceRule } from '../config';
 import { roomCfg } from '../engine/game';
 import { fmtDate, fmtTime, fmtVnd } from '../engine/util';
 import { useGame, useNav } from '../nav';
@@ -30,10 +31,12 @@ export function Result({ sessionId }: { sessionId: string }) {
 
   // Biểu đồ: 24 con số quanh giá thắng (hoặc quanh giá của bạn nếu không có người thắng)
   const center = r.winners[0]?.price ?? r.my[0]?.price ?? r.counts[0]?.[0] ?? 1;
-  const start = Math.max(cfg.minVnd, center - 10);
-  const upTo = Math.min(cfg.maxVnd, start + 23);
+  const rule = priceRule(cfg);
+  const startK = Math.max(1, Math.round(center / rule.step) - 10);
+  const endK = Math.min(rule.levels, startK + 23);
   const countMap = new Map(r.counts);
-  const cols = Array.from({ length: upTo - start + 1 }, (_, i) => start + i);
+  const cols = Array.from({ length: endK - startK + 1 }, (_, i) => (startK + i) * rule.step);
+  const short = (v: number) => (v >= 1_000_000 ? `${+(v / 1_000_000).toFixed(2)}tr` : v >= 1000 ? `${+(v / 1000).toFixed(1)}k` : `${v}`);
   const maxC = Math.max(1, ...cols.map((c) => countMap.get(c) ?? 0));
   const barH = (c: number) => (c === 0 ? 0 : Math.max(6, Math.sqrt(c / maxC) * 120));
 
@@ -174,7 +177,7 @@ export function Result({ sessionId }: { sessionId: string }) {
           <div style={{ display: 'flex', gap: 3, fontSize: 9, color: 'var(--muted)', textAlign: 'center' }} aria-hidden="true">
             {cols.map((c) => (
               <span key={c} style={{ flex: 1, minWidth: 0, fontWeight: winPrices.has(c) ? 700 : 400, color: winPrices.has(c) ? 'var(--lead)' : undefined }}>
-                {c % 3 === 0 || winPrices.has(c) ? c : ''}
+                {(c / rule.step) % 4 === 0 || winPrices.has(c) ? short(c) : ''}
               </span>
             ))}
           </div>
@@ -185,7 +188,7 @@ export function Result({ sessionId }: { sessionId: string }) {
             <Legend outline label="Giá của bạn" />
           </div>
           <div className="xs muted" style={{ lineHeight: 1.5 }}>
-            Mỗi cột là một con số tiền (đồng), số trên cột là số lượt chọn con số đó. Biểu đồ chỉ hiện 24 con số quanh giá thắng. Chiều cao cột theo thang căn bậc hai để thấy rõ các mức ít người chọn.
+            Mỗi cột là một mức giá (bước {fmtVnd(rule.step)}), số trên cột là số lượt chọn mức đó. Biểu đồ hiện 24 mức quanh giá thắng. Chiều cao cột theo thang căn bậc hai để thấy rõ các mức ít người chọn.
           </div>
         </div>
       </div>

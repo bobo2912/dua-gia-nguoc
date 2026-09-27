@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { SCAN_RADII } from '../config';
+import { priceRule, SCAN_HALF } from '../config';
+import { snapPrice } from './PriceInput';
 import { roomCfg, store } from '../engine/game';
 import { fmtNum, fmtTime, fmtVnd } from '../engine/util';
 import { useGame } from '../nav';
@@ -13,73 +14,38 @@ export function ToolSheet({ kind, roomId, center, onClose }: { kind: 'scan' | 't
   return kind === 'scan' ? <ScanSheet roomId={roomId} center={center} onClose={onClose} /> : <ThermoSheet roomId={roomId} onClose={onClose} />;
 }
 
-// ---------------- Minh họa: mỗi con số là một ô ----------------
-type Cell = { n: number; people: number };
-const EXAMPLE: Cell[] = [
-  { n: 120, people: 3 },
-  { n: 121, people: 0 },
-  { n: 122, people: 1 },
-  { n: 123, people: 5 },
-  { n: 124, people: 0 },
-  { n: 125, people: 2 },
-];
-
-function ExampleRow() {
-  return (
-    <div className="col" style={{ gap: 6 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 6 }}>
-        {EXAMPLE.map((c) => (
-          <div
-            key={c.n}
-            className="col"
-            style={{
-              alignItems: 'center',
-              gap: 2,
-              padding: '6px 0',
-              borderRadius: 10,
-              background: c.people === 0 ? 'var(--honey)' : c.people === 1 ? 'var(--lead-soft)' : '#EFE6D2',
-              border: c.people === 0 ? '1.5px solid var(--ink)' : '1.5px solid transparent',
-            }}
-          >
-            <b style={{ fontSize: 13 }}>{c.n}đ</b>
-            <span style={{ fontSize: 10, fontWeight: 600, color: c.people === 1 ? 'var(--lead)' : 'var(--muted)' }}>
-              {c.people === 0 ? 'trống' : `${c.people} người`}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="xs muted" style={{ lineHeight: 1.5 }}>
-        Ví dụ: 121đ và 124đ đang <b>trống</b>. Nếu bạn chọn một trong hai số này, bạn sẽ là người duy nhất ở đó. 123đ đã có 5 người nên chọn nữa là bị trùng.
-      </div>
-    </div>
-  );
-}
-
 // ---------------- Soi vùng giá ----------------
+type Cell = { price: number; taken: boolean; mine: boolean };
+
+/** Gửi giá được chọn về ô nhập giá của tổ săn */
+export const PICK_EVENT = 'dau-gia:pick-price';
+
 function ScanSheet({ roomId, center, onClose }: { roomId: string; center: number; onClose: () => void }) {
   const cfg = roomCfg(roomId);
+  const rule = priceRule(cfg);
   const s = store.state.rooms[roomId].session!;
-  const [text, setText] = useState(String(center));
-  const [radius, setRadius] = useState(SCAN_RADII[1]);
-  const [res, setRes] = useState<{ from: number; to: number; empty: number; total: number; at: number } | null>(null);
+  const [text, setText] = useState(String(snapPrice(center, rule)));
+  const [res, setRes] = useState<{ cells: Cell[]; at: number } | null>(null);
   const [err, setErr] = useState('');
-  const c = parseInt(text, 10) || 0;
-  const from = Math.max(cfg.minVnd, c - radius);
-  const to = Math.min(cfg.maxVnd, c + radius);
+  const c = snapPrice(parseInt(text, 10) || 0, rule);
   const left = store.scanQuota(roomId) - s.toolsUsed.scan;
 
   const run = () => {
     if (!c) {
-      setErr('Nhập con số bạn định ra');
+      setErr('Nhập giá bạn định ra');
       return;
     }
-    const r = store.useScan(roomId, from, to);
+    setText(String(c));
+    const r = store.useScan(roomId, c);
     if (!r.ok) setErr(r.error!);
-    else setRes({ from, to, empty: r.empty!, total: r.total!, at: r.at! });
+    else setRes({ cells: r.cells!, at: r.at! });
+  };
+  const pickPrice = (price: number) => {
+    window.dispatchEvent(new CustomEvent(PICK_EVENT, { detail: { roomId, price } }));
+    onClose();
   };
 
-  const ratio = res ? res.empty / res.total : 0;
-  const verdict = !res ? null : ratio >= 0.5 ? { label: 'Nhiều chỗ trống', color: 'var(--lead)', tip: 'Vùng này dễ có giá duy nhất. Chọn một con số lẻ, ít người nghĩ tới.' } : ratio >= 0.2 ? { label: 'Còn vừa phải', color: 'var(--honey-deep)', tip: 'Vẫn còn cơ hội, nhưng nên tránh số tròn và số "đẹp".' } : { label: 'Gần kín chỗ', color: 'var(--dup)', tip: 'Vùng này đông người. Thử dịch giá sang vùng khác xem sao.' };
+  const free = res ? res.cells.filter((x) => !x.taken && !x.mine).length : 0;
 
   return (
     <Sheet onClose={onClose} label="Soi vùng giá">
@@ -95,46 +61,36 @@ function ScanSheet({ roomId, center, onClose }: { roomId: string; center: number
 
       {!res ? (
         <>
-          <div className="card flat" style={{ gap: 10, padding: 14 }}>
-            <div style={{ fontSize: 14, lineHeight: 1.55 }}>
-              Mỗi con số tiền là một <b>ô</b>. Muốn thắng, bạn cần đứng ở ô <b>chỉ có mình bạn</b>. Soi vùng giá đếm xem quanh con số bạn định ra còn <b>bao nhiêu ô trống</b>, tức là chưa ai chọn.
-            </div>
-            <ExampleRow />
+          <div className="card flat" style={{ gap: 8, padding: 14, fontSize: 14, lineHeight: 1.55 }}>
+            <span>
+              Xem <b>{2 * SCAN_HALF + 1} mức giá</b> quanh giá bạn định ra. Mức nào ghi <b style={{ color: 'var(--lead)' }}>Còn trống</b> là chưa ai chọn: bạn chọn mức đó sẽ là <b>người duy nhất</b> ở đó.
+            </span>
+            <span className="small muted">Kết quả tính tại lúc soi. Người khác vẫn có thể chọn trùng sau đó.</span>
           </div>
-
           <label className="field">
-            Con số bạn định ra
+            Giá bạn định ra
             <div style={{ position: 'relative' }}>
               <input
                 id="scan-center"
                 type="text"
                 inputMode="numeric"
                 autoComplete="off"
-                value={text ? fmtNum(c) : ''}
+                value={text ? fmtNum(parseInt(text, 10) || 0) : ''}
                 onChange={(e) => {
                   setErr('');
-                  setText(e.target.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, 7));
+                  setText(e.target.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, 9));
                 }}
+                onBlur={() => c && setText(String(c))}
                 style={{ width: '100%', paddingRight: 32 }}
               />
               <span style={{ position: 'absolute', right: 14, top: 13, fontWeight: 700 }}>đ</span>
             </div>
           </label>
-          <div className="col" style={{ gap: 6 }}>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>Soi rộng bao nhiêu quanh số đó?</span>
-            <div className="seg" role="radiogroup" aria-label="Độ rộng vùng soi">
-              {SCAN_RADII.map((r) => (
-                <button key={r} role="radio" aria-checked={radius === r} className={radius === r ? 'on' : ''} onClick={() => setRadius(r)}>
-                  ±{r}đ
-                </button>
-              ))}
-            </div>
-            {c > 0 && (
-              <span className="small muted">
-                Sẽ soi {to - from + 1} con số, từ {fmtVnd(from)} đến {fmtVnd(to)}
-              </span>
-            )}
-          </div>
+          {c > 0 && (
+            <span className="small muted" style={{ marginTop: -6 }}>
+              Sẽ soi từ {fmtVnd(Math.max(rule.min, c - SCAN_HALF * rule.step))} đến {fmtVnd(Math.min(rule.max, c + SCAN_HALF * rule.step))} (bước {fmtVnd(rule.step)})
+            </span>
+          )}
           {err && <div style={{ color: 'var(--dup-text)', fontWeight: 600, fontSize: 14 }}>{err}</div>}
           <button className="btn big" onClick={run} disabled={left <= 0}>
             {left > 0 ? 'Soi ngay' : 'Hết lượt soi phiên này'}
@@ -142,37 +98,55 @@ function ScanSheet({ roomId, center, onClose }: { roomId: string; center: number
         </>
       ) : (
         <>
-          <div className="card flat" style={{ gap: 12, padding: 16 }}>
-            <div className="small muted">
-              Từ {fmtVnd(res.from)} đến {fmtVnd(res.to)} ({res.total} con số)
-            </div>
-            <div className="row" style={{ alignItems: 'baseline', gap: 8 }}>
-              <span className="display" style={{ fontSize: 44, lineHeight: 1, fontWeight: 800, color: verdict!.color }}>
-                {res.empty}
-              </span>
-              <span style={{ fontSize: 16, fontWeight: 600 }}>ô còn trống</span>
-            </div>
-            <div className="col" style={{ gap: 6 }}>
-              <div style={{ height: 14, borderRadius: 7, background: '#EFE6D2', overflow: 'hidden' }} aria-hidden="true">
-                <div style={{ width: `${ratio * 100}%`, height: '100%', background: verdict!.color, borderRadius: 7 }} />
-              </div>
-              <div className="row between small">
-                <b style={{ color: verdict!.color }}>{verdict!.label}</b>
-                <span className="muted">
-                  {Math.round(ratio * 100)}% số trong vùng chưa ai chọn
-                </span>
-              </div>
+          <div className="row" style={{ background: free ? 'var(--lead-soft)' : 'var(--dup-soft)', borderRadius: 16, padding: 12, gap: 12 }}>
+            <Bee size={48} mood={free >= 4 ? 'joy' : free > 0 ? 'happy' : 'worried'} />
+            <div style={{ fontSize: 14, lineHeight: 1.5 }}>
+              {free > 0 ? (
+                <>
+                  Có <b>{free} mức giá còn trống</b> quanh {fmtVnd(c)}. Bấm vào một mức để chọn luôn.
+                </>
+              ) : (
+                <>Vùng này đã kín. Thử soi vùng giá khác nhé.</>
+              )}
             </div>
           </div>
-          <div className="row" style={{ background: 'var(--honey-soft)', borderRadius: 16, padding: 12, alignItems: 'flex-start' }}>
-            <Bee size={48} mood={ratio >= 0.5 ? 'joy' : ratio >= 0.2 ? 'happy' : 'worried'} />
-            <div className="small" style={{ lineHeight: 1.5 }}>
-              {verdict!.tip}
-              <br />
-              <span className="muted">Để công bằng, công cụ không cho biết ô nào trống. Kết quả lúc {fmtTime(res.at)}, người khác vẫn đang ra giá.</span>
-            </div>
+          <div className="col" style={{ gap: 6 }}>
+            {res.cells.map((cell) => {
+              const isFree = !cell.taken && !cell.mine;
+              const label = cell.mine ? (cell.taken ? 'Giá của bạn · bị trùng' : 'Giá của bạn · duy nhất') : cell.taken ? 'Đã có người chọn' : 'Còn trống';
+              return (
+                <button
+                  key={cell.price}
+                  className="row"
+                  disabled={!isFree}
+                  onClick={() => pickPrice(cell.price)}
+                  style={{
+                    minHeight: 48,
+                    padding: '0 14px',
+                    borderRadius: 14,
+                    border: isFree ? '2px solid var(--lead)' : '1.5px solid var(--line)',
+                    background: isFree ? '#fff' : cell.mine ? 'var(--honey-soft)' : '#F3EDE0',
+                    opacity: 1,
+                    cursor: isFree ? 'pointer' : 'default',
+                    textAlign: 'left',
+                    color: 'var(--ink)',
+                    outline: cell.price === c ? '2px dashed var(--ink)' : undefined,
+                    outlineOffset: 2,
+                  }}
+                >
+                  <b className="display grow" style={{ fontSize: 19, color: isFree ? 'var(--ink)' : '#8C7F6E' }}>
+                    {fmtVnd(cell.price)}
+                  </b>
+                  <span className="small" style={{ fontWeight: 700, color: isFree ? 'var(--lead)' : cell.mine ? 'var(--honey-text-strong)' : 'var(--muted)' }}>
+                    {label}
+                  </span>
+                  {isFree && <span className="xs" style={{ fontWeight: 700, color: 'var(--lead)' }}>Chọn ›</span>}
+                </button>
+              );
+            })}
           </div>
-          <button className="btn" onClick={onClose}>
+          <div className="xs muted">Kết quả lúc {fmtTime(res.at)}. Để công bằng, công cụ không cho biết mỗi mức có bao nhiêu người.</div>
+          <button className="btn outline" onClick={onClose}>
             Quay lại ra giá
           </button>
           {left > 0 && (

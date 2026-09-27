@@ -20,9 +20,9 @@ export interface BotProfile {
   participants: [number, number];
   /** Số giá mỗi thợ săn ảo ra [min, max] */
   bidsPerBot: [number, number];
-  /** Giá trung bình thợ săn ảo hay chọn (đồng). Càng nhỏ thì giá càng dồn về vùng thấp */
-  typicalVnd: number;
-  /** Xác suất chọn các con số "đẹp" (10, 99, 100, 123, 500...) – dễ bị trùng */
+  /** Mức giá trung bình thợ săn ảo hay chọn, tính theo SỐ BƯỚC GIÁ. Càng nhỏ thì giá càng dồn về vùng thấp */
+  typicalSteps: number;
+  /** Xác suất chọn các mức "đẹp" (10, 20, 50, 99, 100 bước...) – dễ bị trùng */
   roundPref: number;
   /** Xác suất mỗi giây có thợ săn ảo trùng đúng giá đang dẫn đầu (tạo cảm giác bị cướp ngôi) */
   rivalPerSec: number;
@@ -40,9 +40,10 @@ export interface RoomConfig {
   entryCloseBeforeEndSec: number;
   /** Nghỉ giữa hai phiên (giây) */
   breakSec: number;
-  /** Giá tối thiểu và tối đa (đồng). Giá nhập lẻ từng đồng. */
-  minVnd: number;
-  maxVnd: number;
+  /** Bước giá (đồng). Bỏ trống = tự tính theo giá trị quà (xem STEP_TIERS) */
+  stepVnd?: number;
+  /** Giá tối đa (đồng). Bỏ trống = bằng giá trị món quà lớn nhất của phòng */
+  maxVnd?: number;
   /** Lượt ra giá tối đa mỗi người mỗi phiên (0 = không giới hạn, mỗi lượt vẫn tốn 1 giọt mật) */
   maxBidsPerUser: number;
   /** Số người tối đa trong phòng */
@@ -56,8 +57,6 @@ export interface RoomConfig {
   /** Hạng tối thiểu để vào */
   minRank: RankId;
   bots: BotProfile;
-  /** 3 vùng của Nhiệt kế (đồng): thấp, trung, cao */
-  thermoZones: [[number, number], [number, number], [number, number]];
   /** Phòng Bí Mật: xuất hiện theo lịch ẩn */
   secret?: { everySec: number; announceSec: number };
   /** Số lần dùng công cụ mỗi phiên */
@@ -73,16 +72,13 @@ export const ROOMS: RoomConfig[] = [
     freezeSec: 20, // GDD: 60 giây
     entryCloseBeforeEndSec: 0,
     breakSec: 15,
-    minVnd: 1,
-    maxVnd: 50000,
     maxBidsPerUser: 0,
     maxParticipants: 2000,
     prizes: [{ name: 'Voucher nhà hàng 200.000đ', valueVnd: 200000 }],
     noWinnerRule: 'rollover',
     maxRollovers: 3,
     minRank: 'dong',
-    bots: { participants: [40, 60], bidsPerBot: [3, 8], typicalVnd: 20, roundPref: 0.12, rivalPerSec: 0.012 },
-    thermoZones: [[1, 19], [20, 39], [40, 50000]],
+    bots: { participants: [40, 60], bidsPerBot: [3, 8], typicalSteps: 20, roundPref: 0.12, rivalPerSec: 0.012 },
     tools: { scan: 2, thermo: 1 },
   },
   {
@@ -93,16 +89,13 @@ export const ROOMS: RoomConfig[] = [
     freezeSec: 30,
     entryCloseBeforeEndSec: 120, // GDD: vào được trong 40 phút đầu
     breakSec: 60,
-    minVnd: 1,
-    maxVnd: 200000,
     maxBidsPerUser: 0,
     maxParticipants: 5000,
     prizes: [{ name: 'Tai nghe chống ồn cao cấp', valueVnd: 6500000 }],
     noWinnerRule: 'rollover',
     maxRollovers: 2,
     minRank: 'dong',
-    bots: { participants: [70, 100], bidsPerBot: [3, 8], typicalVnd: 30, roundPref: 0.12, rivalPerSec: 0.01 },
-    thermoZones: [[1, 29], [30, 59], [60, 200000]],
+    bots: { participants: [70, 100], bidsPerBot: [3, 8], typicalSteps: 30, roundPref: 0.12, rivalPerSec: 0.01 },
     tools: { scan: 2, thermo: 1 },
   },
   {
@@ -113,8 +106,6 @@ export const ROOMS: RoomConfig[] = [
     freezeSec: 30,
     entryCloseBeforeEndSec: 180,
     breakSec: 60,
-    minVnd: 1,
-    maxVnd: 1000000,
     maxBidsPerUser: 0,
     maxParticipants: 220, // demo: ít chỗ để thấy hiệu ứng "sắp đầy"
     prizes: [
@@ -124,8 +115,7 @@ export const ROOMS: RoomConfig[] = [
     noWinnerRule: 'void', // hàng luxury chỉ có 1 chiếc: bỏ phiên
     maxRollovers: 0,
     minRank: 'dong',
-    bots: { participants: [150, 205], bidsPerBot: [4, 9], typicalVnd: 60, roundPref: 0.12, rivalPerSec: 0.008 },
-    thermoZones: [[1, 59], [60, 119], [120, 1000000]],
+    bots: { participants: [150, 205], bidsPerBot: [4, 9], typicalSteps: 60, roundPref: 0.12, rivalPerSec: 0.008 },
     tools: { scan: 3, thermo: 2 },
   },
   {
@@ -136,16 +126,13 @@ export const ROOMS: RoomConfig[] = [
     freezeSec: 15,
     entryCloseBeforeEndSec: 0,
     breakSec: 0,
-    minVnd: 1,
-    maxVnd: 30000,
     maxBidsPerUser: 0,
     maxParticipants: 1000,
     prizes: [{ name: 'Nước hoa cao cấp 100ml', valueVnd: 4200000 }],
     noWinnerRule: 'rollover',
     maxRollovers: 2,
     minRank: 'dong',
-    bots: { participants: [20, 30], bidsPerBot: [2, 6], typicalVnd: 10, roundPref: 0.12, rivalPerSec: 0.015 },
-    thermoZones: [[1, 9], [10, 19], [20, 30000]],
+    bots: { participants: [20, 30], bidsPerBot: [2, 6], typicalSteps: 10, roundPref: 0.12, rivalPerSec: 0.015 },
     secret: { everySec: 420, announceSec: 30 }, // GDD: báo trước 5 phút
     tools: { scan: 1, thermo: 1 },
   },
@@ -157,16 +144,13 @@ export const ROOMS: RoomConfig[] = [
     freezeSec: 30,
     entryCloseBeforeEndSec: 60,
     breakSec: 60,
-    minVnd: 1,
-    maxVnd: 100000,
     maxBidsPerUser: 0,
     maxParticipants: 300,
     prizes: [{ name: 'Đồng hồ cơ cao cấp', valueVnd: 85000000 }],
     noWinnerRule: 'void',
     maxRollovers: 0,
     minRank: 'vang',
-    bots: { participants: [25, 40], bidsPerBot: [2, 6], typicalVnd: 15, roundPref: 0.12, rivalPerSec: 0.01 },
-    thermoZones: [[1, 9], [10, 24], [25, 100000]],
+    bots: { participants: [25, 40], bidsPerBot: [2, 6], typicalSteps: 15, roundPref: 0.12, rivalPerSec: 0.01 },
     tools: { scan: 2, thermo: 1 },
   },
   {
@@ -177,26 +161,54 @@ export const ROOMS: RoomConfig[] = [
     freezeSec: 20,
     entryCloseBeforeEndSec: 0,
     breakSec: 30,
-    minVnd: 1,
-    maxVnd: 40000,
     maxBidsPerUser: 0,
     maxParticipants: 3000,
     prizes: [
-      { name: 'Combo cà phê 1 tháng', valueVnd: 900000 },
-      { name: 'Combo cà phê 1 tuần', valueVnd: 250000 },
-      { name: 'Combo cà phê 1 tuần', valueVnd: 250000 },
+      { name: 'Voucher trà sữa 50.000đ', valueVnd: 50000 },
+      { name: 'Voucher trà sữa 50.000đ', valueVnd: 50000 },
+      { name: 'Voucher trà sữa 50.000đ', valueVnd: 50000 },
     ],
     noWinnerRule: 'rollover',
     maxRollovers: 3,
     minRank: 'dong',
-    bots: { participants: [35, 50], bidsPerBot: [2, 5], typicalVnd: 15, roundPref: 0.12, rivalPerSec: 0.01 },
-    thermoZones: [[1, 11], [12, 24], [25, 40000]],
+    bots: { participants: [35, 50], bidsPerBot: [2, 5], typicalSteps: 15, roundPref: 0.12, rivalPerSec: 0.01 },
     tools: { scan: 2, thermo: 1 },
   },
 ];
 
-/** Bán kính mặc định khi Soi vùng giá (đồng), người chơi chọn được ±10 / ±25 / ±50 */
-export const SCAN_RADII = [10, 25, 50];
+// ------------------------- Bước giá -------------------------
+/**
+ * Bước giá theo giá trị quà: giá luôn là số tròn, mà vẫn đủ nhiều mức để ít bị trùng.
+ * Ví dụ quà 50.000đ → bước 100đ → 500 mức giá (100đ, 200đ, ..., 50.000đ).
+ */
+export const STEP_TIERS: { below: number; step: number }[] = [
+  { below: 100_000, step: 100 },
+  { below: 1_000_000, step: 500 },
+  { below: 10_000_000, step: 10_000 },
+  { below: Infinity, step: 50_000 },
+];
+
+export interface PriceRule {
+  step: number;
+  min: number;
+  max: number;
+  /** Số mức giá có thể chọn */
+  levels: number;
+  /** Giá trị món quà lớn nhất của phòng */
+  prizeValue: number;
+}
+
+export function priceRule(cfg: RoomConfig): PriceRule {
+  const prizeValue = Math.max(...cfg.prizes.map((p) => p.valueVnd));
+  const step = cfg.stepVnd ?? STEP_TIERS.find((t) => prizeValue < t.below)!.step;
+  const max = Math.floor((cfg.maxVnd ?? prizeValue) / step) * step;
+  return { step, min: step, max, levels: max / step, prizeValue };
+}
+
+/** Soi vùng giá: xem bao nhiêu mức giá mỗi bên quanh giá định ra */
+export const SCAN_HALF = 5;
+/** Nhiệt kế: ranh giới vùng thấp / trung tính theo bội số của typicalSteps */
+export const THERMO_SPLIT = [1, 2];
 
 // ------------------------- Giọt mật (lượt ra giá) -------------------------
 export const DROPS = {

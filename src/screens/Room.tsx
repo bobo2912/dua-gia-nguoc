@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { isFrozen, isRunning, myBids, participantsOf, roomCfg, visibleStatuses } from '../engine/game';
 import type { BidStatus } from '../engine/types';
-import { fmtAgo, fmtClock, fmtNum, fmtVnd, randInt } from '../engine/util';
+import { fmtAgo, fmtClock, fmtVnd, randInt } from '../engine/util';
 import { useGame, useNav } from '../nav';
+import { priceRule } from '../config';
+import { PriceInput, snapPrice } from '../components/PriceInput';
+import { PICK_EVENT } from '../components/ToolSheet';
 import { Bee } from '../components/Bee';
 import { IcBack, IcBell, IcCircle, IcCrown, IcDrop, IcGavel, IcLock, IcSearch, IcSnow, IcThermo, IcX } from '../components/Icons';
 
@@ -29,10 +32,25 @@ export function Room({ roomId }: { roomId: string }) {
   const cfg = roomCfg(roomId);
   const s = g.state.rooms[roomId].session;
   const now = Date.now();
-  const [priceText, setPriceText] = useState(() => String(randInt(Math.ceil(cfg.bots.typicalVnd / 2), cfg.bots.typicalVnd * 2)));
-  const price = parseInt(priceText, 10) || 0;
+  const rule = priceRule(cfg);
+  const [priceText, setPriceText] = useState(() => String(randInt(Math.ceil(cfg.bots.typicalSteps / 2), cfg.bots.typicalSteps * 2) * rule.step));
+  const price = snapPrice(parseInt(priceText, 10) || 0, rule);
   const [err, setErr] = useState('');
   const [flash, setFlash] = useState('');
+
+  // nhận giá được chọn từ Soi vùng giá
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<{ roomId: string; price: number }>).detail;
+      if (d.roomId === roomId) {
+        setErr('');
+        setPriceText(String(d.price));
+        window.setTimeout(() => document.getElementById('bid-input')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50);
+      }
+    };
+    window.addEventListener(PICK_EVENT, on);
+    return () => window.removeEventListener(PICK_EVENT, on);
+  }, [roomId]);
 
   useEffect(() => {
     if (!flash) return;
@@ -76,6 +94,7 @@ export function Room({ roomId }: { roomId: string }) {
       setErr('Nhập giá bạn muốn ra');
       return;
     }
+    if (String(price) !== priceText) setPriceText(String(price));
     const r = g.placeBid(roomId, price);
     if (!r.ok) {
       setErr(r.error!);
@@ -88,11 +107,6 @@ export function Room({ roomId }: { roomId: string }) {
     } catch {
       /* bỏ qua */
     }
-  };
-
-  const setP = (v: number) => {
-    setErr('');
-    setPriceText(String(Math.max(cfg.minVnd, Math.min(cfg.maxVnd, Math.round(v)))));
   };
 
   const canBid = running && entry.ok && mine.length < maxBids && bal > 0;
@@ -211,7 +225,7 @@ export function Room({ roomId }: { roomId: string }) {
                 </div>
               ))}
               <div className="small muted" style={{ marginTop: 4 }}>
-                Giá từ {fmtVnd(cfg.minVnd)} đến {fmtVnd(cfg.maxVnd)}, nhập lẻ từng đồng · {maxBids === Infinity ? 'Không giới hạn lượt ra giá' : `Tối đa ${maxBids} lượt`}
+                Giá trị quà {fmtVnd(rule.prizeValue)} · Bước giá {fmtVnd(rule.step)} · Giá từ {fmtVnd(rule.min)} đến {fmtVnd(rule.max)} · {maxBids === Infinity ? 'Không giới hạn lượt ra giá' : `Tối đa ${maxBids} lượt`}
               </div>
               {allPrizes.length > 1 && <div className="small muted">{allPrizes.length} giá duy nhất thấp nhất lần lượt nhận quà.</div>}
             </div>
@@ -291,80 +305,7 @@ export function Room({ roomId }: { roomId: string }) {
           <h2 className="section-title" style={{ fontSize: 20 }}>
             Ra giá mới
           </h2>
-          <div className="row" style={{ gap: 12 }}>
-            <button
-              className="btn outline"
-              aria-label="Giảm 1 đồng"
-              style={{ width: 52, height: 52, padding: 0, fontSize: 26, background: 'var(--cream)', color: 'var(--ink)' }}
-              onClick={() => setP(price - 1)}
-            >
-              −
-            </button>
-            <label className="grow" style={{ position: 'relative' }}>
-              <span className="visually-hidden">Giá bạn muốn ra (đồng)</span>
-              <input
-                id="bid-input"
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder="0"
-                value={priceText ? fmtNum(price) : ''}
-                onChange={(e) => {
-                  setErr('');
-                  setPriceText(e.target.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, 7));
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') submit();
-                }}
-                style={{
-                  width: '100%',
-                  height: 60,
-                  borderRadius: 16,
-                  background: 'var(--honey-soft)',
-                  border: '2px solid var(--honey-deep)',
-                  textAlign: 'center',
-                  fontFamily: 'var(--display)',
-                  fontSize: 34,
-                  fontWeight: 800,
-                  color: 'var(--ink)',
-                  paddingRight: 40,
-                  paddingLeft: 12,
-                  minWidth: 0,
-                }}
-              />
-              <span className="display" style={{ position: 'absolute', right: 14, top: 12, fontSize: 26, fontWeight: 800, color: 'var(--honey-text)', pointerEvents: 'none' }}>
-                đ
-              </span>
-            </label>
-            <button
-              className="btn outline"
-              aria-label="Tăng 1 đồng"
-              style={{ width: 52, height: 52, padding: 0, fontSize: 26, background: 'var(--cream)', color: 'var(--ink)' }}
-              onClick={() => setP(price + 1)}
-            >
-              +
-            </button>
-          </div>
-          <div className="row" style={{ gap: 8 }}>
-            {[-10, 10, 100].map((d) => (
-              <button
-                key={d}
-                className="btn outline sm"
-                style={{ flex: 1, height: 40, border: '1.5px solid var(--line)', padding: 0, background: '#fff', color: 'var(--ink)' }}
-                onClick={() => setP(price + d)}
-              >
-                {d > 0 ? '+' : '−'}
-                {Math.abs(d)}đ
-              </button>
-            ))}
-            <button
-              className="btn outline sm"
-              style={{ flex: 1.3, height: 40, border: '1.5px solid var(--line)', padding: 0, background: '#fff', color: 'var(--ink)' }}
-              onClick={() => setP(randInt(1, cfg.bots.typicalVnd * 3))}
-            >
-              Ngẫu nhiên
-            </button>
-          </div>
+          <PriceInput rule={rule} text={priceText} onText={(t) => { setErr(''); setPriceText(t); }} onSubmit={submit} typicalSteps={cfg.bots.typicalSteps} dark={frozen} />
           <button className="btn big" onClick={submit} disabled={!canBid}>
             <IcGavel color="#1C1712" />
             Ra giá · 1 giọt mật
@@ -414,7 +355,7 @@ export function Room({ roomId }: { roomId: string }) {
                 className="card"
                 disabled={frozen || left <= 0}
                 style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: '10px 12px', boxShadow: 'none', textAlign: 'left', minHeight: 72, background: frozen ? 'transparent' : '#fff', color: 'inherit', borderColor: frozen ? 'rgba(255,246,224,0.3)' : 'var(--ink)' }}
-                onClick={() => nav.openTool(k, roomId, price || cfg.bots.typicalVnd)}
+                onClick={() => nav.openTool(k, roomId, price || cfg.bots.typicalSteps * rule.step)}
               >
                 {k === 'scan' ? <IcSearch /> : <IcThermo />}
                 <span className="col">

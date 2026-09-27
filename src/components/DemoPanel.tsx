@@ -42,6 +42,17 @@ export function DemoPanel({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="col" style={{ gap: 8 }}>
+        <b>Giả lập Hũ mật (dồn thêm quà vào tổ)</b>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+          {ROOMS.map((r) => (
+            <button key={r.id} className="btn outline sm" style={{ padding: '0 4px', fontSize: 13 }} onClick={() => store.demoAddJackpot(r.id)}>
+              + {r.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="col" style={{ gap: 8 }}>
         <div className="row between">
           <b>Giả lập hạng</b>
           <span className="small muted">
