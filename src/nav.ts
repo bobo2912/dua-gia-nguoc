@@ -1,0 +1,30 @@
+import { createContext, useContext, useSyncExternalStore } from 'react';
+import type { EarnActionId } from './config';
+import { store } from './engine/game';
+
+export type Screen =
+  | { name: 'lobby' }
+  | { name: 'room'; roomId: string }
+  | { name: 'result'; sessionId: string }
+  | { name: 'win'; sessionId: string }
+  | { name: 'wallet' }
+  | { name: 'rank' }
+  | { name: 'history' };
+
+export interface Nav {
+  screen: Screen;
+  go: (s: Screen) => void;
+  openBank: (id: EarnActionId) => void;
+  openDemo: () => void;
+  openTool: (kind: 'scan' | 'thermo', roomId: string) => void;
+  toast: (text: string, tone?: 'good' | 'warn' | 'info') => void;
+}
+
+export const NavCtx = createContext<Nav>(null as unknown as Nav);
+export const useNav = () => useContext(NavCtx);
+
+/** Đăng ký nhận cập nhật từ engine (0,5 giây/lần) */
+export function useGame() {
+  useSyncExternalStore(store.subscribe, store.getVersion);
+  return store;
+}
