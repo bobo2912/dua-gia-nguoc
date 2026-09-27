@@ -95,6 +95,13 @@ Engine trong `src/engine/game.ts` minh họa logic nghiệp vụ. Trong sản ph
 - Định danh người chơi theo eKYC, chống bot và nhóm tài khoản phối hợp.
 - Push notification tuân theo trần mỗi ngày và giờ yên lặng (tham số trong `SAFETY`).
 
+## Phiên bản và cập nhật
+
+- Số phiên bản hiện ở cuối sảnh và trong bảng Công cụ demo, dạng `v0.3.0 · 3d6995d`. Phần `0.3.0` lấy từ `package.json`; phần sau là mã commit, tự đổi mỗi lần bạn đẩy code lên GitHub.
+- App tự kiểm tra bản mới (file `version.json` trên GitHub Pages) khi mở, mỗi 2 phút và mỗi khi quay lại app. Có bản mới thì hiện thanh **Đã có bản mới · Cập nhật**. Bấm Cập nhật để tải bản mới.
+- Có thể bấm **Kiểm tra bản mới** trong Công cụ demo.
+- Muốn đổi số phiên bản chính: sửa dòng `"version"` trong `package.json`.
+
 ## Build
 
 ```bash

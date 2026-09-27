@@ -20,6 +20,8 @@ export interface Nav {
   openDemo: () => void;
   openTool: (kind: 'scan' | 'thermo', roomId: string, center: number) => void;
   toast: (text: string, tone?: 'good' | 'warn' | 'info') => void;
+  /** Kiểm tra bản mới trên máy chủ; hiện nút cập nhật nếu có */
+  checkUpdate: (manual?: boolean) => Promise<void>;
 }
 
 export const NavCtx = createContext<Nav>(null as unknown as Nav);

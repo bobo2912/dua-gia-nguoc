@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { ROOMS } from '../config';
+import { RANKS, ROOMS } from '../config';
+import { rankOf } from '../engine/game';
+import { APP_BUILD, versionLabel } from '../version';
 import { store } from '../engine/game';
 import { useGame, useNav } from '../nav';
 import { Sheet } from './common';
@@ -10,6 +12,8 @@ export function DemoPanel({ onClose }: { onClose: () => void }) {
   const nav = useNav();
   const p = g.state.profile;
   const [confirmReset, setConfirmReset] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const cur = rankOf(p.huntPoints);
   return (
     <Sheet onClose={onClose} label="Công cụ demo">
       <div className="display" style={{ fontSize: 24, fontWeight: 800 }}>
@@ -34,6 +38,37 @@ export function DemoPanel({ onClose }: { onClose: () => void }) {
               {r.name}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="col" style={{ gap: 8 }}>
+        <div className="row between">
+          <b>Giả lập hạng</b>
+          <span className="small muted">
+            Đang: {cur.name} · {p.huntPoints.toLocaleString('vi-VN').replace(/,/g, '.')} điểm săn
+          </span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 }}>
+          {RANKS.map((r) => (
+            <button
+              key={r.id}
+              className={`btn sm ${cur.id === r.id ? '' : 'outline'}`}
+              style={{ padding: 0, fontSize: 13 }}
+              aria-pressed={cur.id === r.id}
+              onClick={() => store.demoSetRank(r.id)}
+            >
+              <span style={{ width: 10, height: 10, borderRadius: 5, background: r.color, border: '1px solid #1C1712', flexShrink: 0 }} />
+              {r.name}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+          <button className="btn outline sm" onClick={() => store.demoAddHunt(100)}>
+            +100 điểm săn
+          </button>
+          <button className="btn outline sm" onClick={() => store.demoAddHunt(-100)}>
+            −100 điểm săn
+          </button>
         </div>
       </div>
 
@@ -82,6 +117,24 @@ export function DemoPanel({ onClose }: { onClose: () => void }) {
           Đặt lại dữ liệu demo
         </button>
       )}
+      <div className="card flat" style={{ padding: 14, gap: 8 }}>
+        <div className="row between">
+          <b>Phiên bản</b>
+          <span style={{ fontFamily: 'monospace', fontSize: 13 }}>{versionLabel()}</span>
+        </div>
+        <span className="xs muted">Build lúc {new Date(APP_BUILD.time).toLocaleString('vi-VN')}</span>
+        <button
+          className="btn outline sm"
+          disabled={checking}
+          onClick={async () => {
+            setChecking(true);
+            await nav.checkUpdate(true);
+            setChecking(false);
+          }}
+        >
+          {checking ? 'Đang kiểm tra…' : 'Kiểm tra bản mới'}
+        </button>
+      </div>
       <button className="btn link" onClick={onClose}>
         Đóng
       </button>

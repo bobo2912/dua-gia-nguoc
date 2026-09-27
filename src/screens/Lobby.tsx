@@ -3,6 +3,7 @@ import { isRunning, myBids, participantsOf, rankIndex, rankOf, nextRank } from '
 import type { GameStore } from '../engine/game';
 import { fmtAgo, fmtClock, fmtVnd } from '../engine/util';
 import { useGame, useNav } from '../nav';
+import { versionLabel } from '../version';
 import { Bee } from '../components/Bee';
 import { BottomNav, PrizeImage } from '../components/common';
 import { HexPattern, HoneyJar, IcBack, IcBell, IcClock, IcDrop, IcFlame, IcGift, IcHex, IcLock, IcSettings, IcUsers } from '../components/Icons';
@@ -175,6 +176,9 @@ export function Lobby() {
             ))}
           </div>
         </div>
+        <button className="version-tag btn link" style={{ width: '100%', display: 'block' }} onClick={nav.openDemo}>
+          Đấu giá {versionLabel()}
+        </button>
       </div>
       <BottomNav />
     </>

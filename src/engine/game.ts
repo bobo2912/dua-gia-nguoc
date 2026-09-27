@@ -840,7 +840,7 @@ export class GameStore {
   private addHuntPoints(pts: number, s?: Session) {
     const p = this.state.profile;
     const before = rankOf(p.huntPoints);
-    p.huntPoints += pts;
+    p.huntPoints = Math.max(0, p.huntPoints + pts);
     if (s) s.pointsEarned += pts;
     const after = rankOf(p.huntPoints);
     if (after.id !== before.id) {
@@ -918,6 +918,18 @@ export class GameStore {
     const now = Date.now();
     this.state.profile.drops.push({ id: uid('d'), amount: n, remaining: n, source: 'thưởng', label: 'Quà demo', at: now, expiresAt: endOfWeek(now) });
     this.ledger('Quà demo', n, now);
+    this.changed(true);
+  }
+  /** Giả lập hạng: đặt điểm săn về ngưỡng của hạng được chọn */
+  demoSetRank(id: string) {
+    const r = RANKS.find((x) => x.id === id);
+    if (!r) return;
+    this.state.profile.huntPoints = r.minPoints;
+    this.emit({ type: 'toast', tone: 'good', text: `Đã chuyển sang hạng ${r.name} · ${r.bee}` });
+    this.changed(true);
+  }
+  demoAddHunt(n: number) {
+    this.addHuntPoints(n);
     this.changed(true);
   }
   demoToggleGolden() {

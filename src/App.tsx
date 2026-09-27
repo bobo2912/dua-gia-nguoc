@@ -17,6 +17,7 @@ import { ToolSheet } from './components/ToolSheet';
 import { GavelOverlay } from './components/GavelOverlay';
 import { BreakModal } from './components/BreakModal';
 import { Toasts, type ToastItem } from './components/Toasts';
+import { applyUpdate, checkForUpdate, type UpdateInfo } from './version';
 
 export default function App() {
   const [stack, setStack] = useState<Screen[]>([{ name: 'lobby' }]);
@@ -29,6 +30,7 @@ export default function App() {
   const [tool, setTool] = useState<{ kind: 'scan' | 'thermo'; roomId: string; center: number } | null>(null);
   const [gavel, setGavel] = useState<{ sessionId: string; won: boolean } | null>(null);
   const [brk, setBrk] = useState(false);
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const screenRef = useRef(screen);
   screenRef.current = screen;
   const stackRef = useRef(stack);
@@ -143,7 +145,33 @@ export default function App() {
     };
   }, [go, pushToast]);
 
+  const checkUpdate = useCallback(
+    async (manual = false) => {
+      const r = await checkForUpdate();
+      if (r && r !== 'unavailable') {
+        setUpdate(r);
+        if (manual) pushToast({ tone: 'good', text: `Đã có bản mới v${r.version} · ${r.build}` });
+      } else if (manual) {
+        pushToast({ tone: 'info', text: r === 'unavailable' ? 'Không kiểm tra được bản mới ở chế độ này (chỉ có khi mở từ GitHub Pages).' : 'Bạn đang dùng bản mới nhất.' });
+      }
+    },
+    [pushToast],
+  );
+
+  // Tự kiểm tra bản mới khi mở app, mỗi 2 phút và mỗi khi quay lại app
+  useEffect(() => {
+    checkUpdate();
+    const t = window.setInterval(() => checkUpdate(), 120000);
+    const onVis = () => document.visibilityState === 'visible' && checkUpdate();
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.clearInterval(t);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [checkUpdate]);
+
   const nav: Nav = {
+    checkUpdate,
     screen,
     go,
     back,
@@ -207,6 +235,22 @@ export default function App() {
           />
         )}
         {brk && <BreakModal onClose={() => setBrk(false)} />}
+        {update && !overlayOpen && (
+          <div className="update-bar" role="status">
+            <div className="col grow" style={{ gap: 1 }}>
+              <b style={{ fontSize: 14 }}>Đã có bản mới</b>
+              <span className="xs" style={{ opacity: 0.85 }}>
+                v{update.version} · {update.build}
+              </span>
+            </div>
+            <button className="btn sm" style={{ height: 40, border: 'none' }} onClick={() => applyUpdate(update)}>
+              Cập nhật
+            </button>
+            <button className="icon-btn" style={{ width: 36, height: 36 }} aria-label="Để sau" onClick={() => setUpdate(null)}>
+              ×
+            </button>
+          </div>
+        )}
       </div>
     </NavCtx.Provider>
   );

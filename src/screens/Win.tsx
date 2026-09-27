@@ -39,7 +39,7 @@ export function Win({ sessionId }: { sessionId: string }) {
           <path d="M28 290l8 5v10l-8 5-8-5v-10z" fill="#D4A017" />
         </g>
       </svg>
-      <div className="row" style={{ justifyContent: 'flex-end', padding: '12px 16px 0', position: 'relative' }}>
+      <div className="row" style={{ justifyContent: 'flex-end', padding: 'calc(12px + env(safe-area-inset-top, 0px)) 16px 0', position: 'relative' }}>
         <button className="icon-btn light" aria-label="Đóng" onClick={() => nav.go({ name: 'lobby' })}>
           <IcClose />
         </button>
