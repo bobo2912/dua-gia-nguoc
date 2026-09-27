@@ -10,7 +10,18 @@
     <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;background:#1C1712;color:#FFF6E0;font-family:system-ui,sans-serif">
+        <div style="font-size:26px;font-weight:800;color:#F5B301">Mua đồ luxury giá bình dân</div>
+        <div style="font-size:14px">Đang tải game…</div>
+        <div id="boot-hint" style="display:none;font-size:13px;line-height:1.6;max-width:340px;color:#E9DFC9">
+          Trang vẫn chưa tải được. Nếu bạn mở qua GitHub Pages, hãy kiểm tra
+          <b>Settings → Pages → Source</b> đã chọn <b>GitHub Actions</b> và workflow đã chạy xong.
+          Nếu bạn mở file trên máy, hãy dùng file trong thư mục <b>dist</b> sau khi chạy <code>npm run build</code>.
+        </div>
+      </div>
+    </div>
+    <script>setTimeout(function(){var h=document.getElementById('boot-hint');if(h)h.style.display='block'},4000)</script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
