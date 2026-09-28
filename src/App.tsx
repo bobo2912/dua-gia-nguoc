@@ -290,6 +290,14 @@ export default function App() {
             );
           })}
         </div>
+        {/* Dải màu cố định che vùng tai thỏ và thanh home. iOS 26 lấy màu các phần tử cố định ở mép màn hình
+            để tô thanh trạng thái / vùng thanh home; không có dải này iOS sẽ phủ lớp mờ sáng lên header và menu. */}
+        <div className="edge edge-top" aria-hidden="true" style={{ background: screen.name === 'win' ? 'var(--honey)' : 'var(--ink)' }} />
+        <div
+          className="edge edge-bottom"
+          aria-hidden="true"
+          style={{ background: ['lobby', 'wallet', 'rank', 'history'].includes(screen.name) ? 'var(--card)' : 'var(--cream)' }}
+        />
         <Toasts items={toasts} onClose={(id) => setToasts((xs) => xs.filter((x) => x.id !== id))} />
         {outbid && (
           <OutbidSheet
