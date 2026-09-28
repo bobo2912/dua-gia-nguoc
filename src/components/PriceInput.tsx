@@ -16,6 +16,8 @@ interface Props {
   onSubmit: () => void;
   typicalSteps: number;
   dark?: boolean;
+  /** Gọi khi người chơi bấm vào ô nhập giá */
+  onFocus?: () => void;
 }
 
 /**
@@ -24,7 +26,7 @@ interface Props {
  * - nút −/+ nhảy 1 bước, giữ nút thì chạy nhanh dần
  * - thanh kéo bắt vào bước giá
  */
-export function PriceInput({ rule, text, onText, onSubmit, typicalSteps, dark }: Props) {
+export function PriceInput({ rule, text, onText, onSubmit, typicalSteps, dark, onFocus }: Props) {
   const value = parseInt(text, 10) || 0;
   const [note, setNote] = useState('');
   const hold = useRef<{ t: number | null; n: number }>({ t: null, n: 0 });
@@ -107,6 +109,7 @@ export function PriceInput({ rule, text, onText, onSubmit, typicalSteps, dark }:
               onText(e.target.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, 9));
             }}
             onBlur={round}
+            onFocus={onFocus}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 round();

@@ -89,6 +89,17 @@ export function Room({ roomId }: { roomId: string }) {
   const remaining = s.endAt - now;
   const freezeTotal = cfg.freezeSec * 1000;
 
+  /** Đưa khung Ra giá lên sát đầu vùng cuộn để thấy ngay trạng thái bên dưới */
+  const scrollBidToTop = (delay = 60) => {
+    window.setTimeout(() => {
+      const card = document.getElementById('bid-card');
+      const sc = card?.closest('.scroll') as HTMLElement | null;
+      if (!card || !sc) return;
+      const top = card.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - 12;
+      sc.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    }, delay);
+  };
+
   const submit = () => {
     if (!price) {
       setErr('Nhập giá bạn muốn ra');
@@ -102,6 +113,7 @@ export function Room({ roomId }: { roomId: string }) {
     }
     setErr('');
     setFlash(`Đã ra giá ${fmtVnd(price)}`);
+    scrollBidToTop();
     try {
       navigator.vibrate?.(30);
     } catch {
@@ -236,6 +248,7 @@ export function Room({ roomId }: { roomId: string }) {
       {/* ---------- Ra giá ---------- */}
       <div className="section">
         <div
+          id="bid-card"
           className="card"
           style={{ padding: 14, gap: 10, ...(frozen ? { background: 'rgba(255,246,224,0.06)', borderColor: 'var(--cream)', boxShadow: 'none', color: 'var(--cream)' } : {}) }}
         >
@@ -247,7 +260,7 @@ export function Room({ roomId }: { roomId: string }) {
               Ví còn <b>{bal}</b> giọt
             </span>
           </div>
-          <PriceInput rule={rule} text={priceText} onText={(t) => { setErr(''); setPriceText(t); }} onSubmit={submit} typicalSteps={cfg.bots.typicalSteps} dark={frozen} />
+          <PriceInput rule={rule} text={priceText} onText={(t) => { setErr(''); setPriceText(t); }} onSubmit={submit} typicalSteps={cfg.bots.typicalSteps} dark={frozen} onFocus={() => scrollBidToTop(350)} />
           <button className="btn big" style={{ height: 48, fontSize: 18 }} onClick={submit} disabled={!canBid}>
             <IcGavel size={20} color="#1C1712" />
             Ra giá · 1 giọt mật
@@ -406,6 +419,8 @@ export function Room({ roomId }: { roomId: string }) {
           Công cụ demo: tua đến sát {cfg.freezeSec} giây cuối
         </button>
       </div>
+      {/* chừa chỗ để khung Ra giá luôn cuộn được lên đầu màn hình */}
+      <div aria-hidden="true" style={{ height: '30vh' }} />
     </div>
   );
 }
