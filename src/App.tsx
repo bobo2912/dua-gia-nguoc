@@ -155,7 +155,7 @@ export default function App() {
   const pushToast = useCallback((t: Omit<ToastItem, 'id'>) => {
     const id = Math.random().toString(36).slice(2);
     setToasts((xs) => [{ ...t, id }, ...xs].slice(0, 3));
-    window.setTimeout(() => setToasts((xs) => xs.filter((x) => x.id !== id)), 5500);
+    window.setTimeout(() => setToasts((xs) => xs.filter((x) => x.id !== id)), 3000);
   }, []);
 
   useEffect(() => {

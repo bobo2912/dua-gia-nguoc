@@ -54,6 +54,31 @@ window.addEventListener('orientationchange', () => setTimeout(fitHeight, 300));
 window.visualViewport?.addEventListener('resize', fitHeight);
 document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && setTimeout(fitHeight, 100));
 
+// ---------- Chặn phóng to / thu nhỏ ----------
+// iPhone bỏ qua user-scalable=no trong Safari, nên chặn thêm cử chỉ chụm 2 ngón và chạm đúp.
+const stop = (e: Event) => e.preventDefault();
+document.addEventListener('gesturestart', stop, { passive: false });
+document.addEventListener('gesturechange', stop, { passive: false });
+document.addEventListener('gestureend', stop, { passive: false });
+document.addEventListener('touchmove', (e) => (e as TouchEvent).touches.length > 1 && e.preventDefault(), { passive: false });
+let lastTouchEnd = 0;
+document.addEventListener(
+  'touchend',
+  (e) => {
+    const now = Date.now();
+    const t = e.target as HTMLElement;
+    // chạm đúp nhanh: chặn phóng to (trừ ô nhập và nút bấm để bấm liên tục vẫn nhạy)
+    if (now - lastTouchEnd < 300 && !t.closest('input, textarea, button, a, label')) e.preventDefault();
+    lastTouchEnd = now;
+  },
+  { passive: false },
+);
+// Ctrl/⌘ + cuộn chuột hoặc Ctrl/⌘ + phím +/− trên máy tính
+window.addEventListener('wheel', (e) => e.ctrlKey && e.preventDefault(), { passive: false });
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && ['+', '-', '=', '0'].includes(e.key)) e.preventDefault();
+});
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>

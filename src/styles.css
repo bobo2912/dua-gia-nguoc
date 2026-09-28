@@ -259,3 +259,9 @@ html.standalone .app { bottom: auto; height: var(--app-h, 100vh); }
 @keyframes glow { 50% { box-shadow: 0 0 0 3px var(--honey), 0 6px 0 3px var(--honey-deep), 0 0 38px rgba(245, 179, 1, 0.85); } }
 .info-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 8px; background: #F6EEDA; font-size: 12px; color: var(--muted); }
 .info-chip b { color: var(--ink); }
+
+/* ------- Không cho phóng to/thu nhỏ ------- */
+/* chạm nhanh 2 lần không phóng to; chỉ cho cuộn và chạm */
+html, body, #root, .app { touch-action: manipulation; }
+/* ô nhập dưới 16px khiến iPhone tự phóng to khi bấm vào */
+input, select, textarea { font-size: max(16px, 1em); }
