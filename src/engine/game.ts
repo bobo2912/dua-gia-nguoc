@@ -42,6 +42,7 @@ import {
   ME,
   type Bid,
   type BidStatus,
+  type Difficulty,
   type Bot,
   type DropEntry,
   type DropSource,
@@ -117,7 +118,17 @@ export function visibleStatuses(s: Session, now: number): { bid: Bid; status: Bi
 }
 
 // ------------------------- Tạo phiên -------------------------
+// ------------------------- Độ khó (công cụ demo) -------------------------
+/** Hệ số theo độ khó: số giá thợ săn ảo ra, xác suất trùng giá dẫn đầu, tỉ lệ "bắn tỉa" giây cuối */
+const DIFFICULTY: Record<Difficulty, { bids: number; rival: number; sniper: number; avoidMine: boolean }> = {
+  easy: { bids: 0.45, rival: 0, sniper: 0, avoidMine: true },
+  normal: { bids: 1, rival: 1, sniper: 0.12, avoidMine: false },
+  hard: { bids: 1.4, rival: 2.2, sniper: 0.2, avoidMine: false },
+};
+let diffNow: Difficulty = 'normal';
+
 function newSession(cfg: RoomConfig, no: number, startAt: number, jackpot: Prize[], rolloverCount: number): Session {
+  const D = DIFFICULTY[diffNow];
   const nBots = Math.min(randInt(cfg.bots.participants[0], cfg.bots.participants[1]), cfg.maxParticipants - 1);
   const endAt = startAt + cfg.durationSec * 1000;
   const bots: Bot[] = [];
@@ -131,9 +142,9 @@ function newSession(cfg: RoomConfig, no: number, startAt: number, jackpot: Prize
     bots.push(bot);
     const joinAt = startAt + Math.pow(Math.random(), 1.4) * dur * 0.8;
     botJoins.push({ botId: bot.id, at: joinAt });
-    const k = randInt(cfg.bots.bidsPerBot[0], cfg.bots.bidsPerBot[1]);
+    const k = Math.max(1, Math.round(randInt(cfg.bots.bidsPerBot[0], cfg.bots.bidsPerBot[1]) * D.bids));
     for (let j = 0; j < k; j++) {
-      const sniper = Math.random() < 0.12;
+      const sniper = Math.random() < D.sniper;
       const from = sniper ? endAt - cfg.freezeSec * 1000 : joinAt;
       const at = Math.max(joinAt, rand(from, endAt - 800));
       schedule.push({ owner: bot.id, at });
@@ -321,6 +332,7 @@ export class GameStore {
     const now = Date.now();
     const dt = Math.min(5, (now - this.lastTick) / 1000);
     this.lastTick = now;
+    diffNow = this.state.profile.demoDifficulty ?? 'normal';
     for (const cfg of ROOMS) this.tickRoom(cfg, now, dt);
     this.expireCheck(now);
     const p = this.state.profile;
@@ -410,14 +422,16 @@ export class GameStore {
       if (!s.joinedBots.includes(job.owner)) continue;
       const own = new Set(s.bids.filter((b) => b.owner === job.owner).map((b) => b.price));
       let price = samplePrice(cfg);
-      for (let t = 0; t < 6 && own.has(price); t++) price = samplePrice(cfg);
+      const avoid = DIFFICULTY[diffNow].avoidMine ? new Set(myBids(s).map((b) => b.price)) : null;
+      for (let t = 0; t < 8 && (own.has(price) || avoid?.has(price)); t++) price = samplePrice(cfg);
+      if (avoid?.has(price)) continue;
       if (own.has(price)) continue;
       if ((beforeCounts.get(price) ?? 0) === 1) newDups++;
       beforeCounts.set(price, (beforeCounts.get(price) ?? 0) + 1);
       this.addBid(s, job.owner, price, job.at);
     }
     // 3. "đối thủ" trùng đúng giá đang dẫn đầu của người chơi (chỉ khi chưa đóng băng)
-    if (!frozenNow && s.myLeadBidId && s.joinedBots.length > 0 && Math.random() < cfg.bots.rivalPerSec * dt) {
+    if (!frozenNow && s.myLeadBidId && s.joinedBots.length > 0 && Math.random() < cfg.bots.rivalPerSec * DIFFICULTY[diffNow].rival * dt) {
       const myLead = s.bids.find((b) => b.id === s.myLeadBidId);
       if (myLead) {
         const candidates = s.joinedBots.filter((id) => !s.bids.some((b) => b.owner === id && b.price === myLead.price));
@@ -503,6 +517,15 @@ export class GameStore {
   private resolve(cfg: RoomConfig, rt: RoomRuntime, s: Session) {
     // xử lý nốt các giá đã lên lịch trước giờ đóng
     this.runSessionTail(cfg, s);
+    // Công cụ demo: hỗ trợ thắng — bỏ giá thợ săn ảo ở mức bằng hoặc thấp hơn giá thấp nhất của bạn
+    let demoBoost = false;
+    const chance = this.state.profile.demoWinChance ?? 0;
+    const mineNow = myBids(s);
+    if (mineNow.length && chance > 0 && Math.random() < chance) {
+      const m = Math.min(...mineNow.map((b) => b.price));
+      s.bids = s.bids.filter((b) => b.owner === ME || b.price > m);
+      demoBoost = true;
+    }
     const counts = countPrices(s.bids);
     const uniques = [...counts.entries()].filter(([, c]) => c === 1).map(([p]) => p).sort((a, b) => a - b);
     const allPrizes = [...s.prizes, ...s.jackpot];
@@ -570,6 +593,7 @@ export class GameStore {
       csv,
       my,
       nearMiss,
+      demoBoost,
       pointsEarned: 0,
     };
 
@@ -969,6 +993,26 @@ export class GameStore {
       rt.pendingRollovers++;
     }
     this.emit({ type: 'toast', tone: 'good', roomId, text: `Hũ mật Tổ ${cfg.name} vừa được dồn thêm quà!` });
+    this.changed(true);
+  }
+  demoSetDifficulty(d: Difficulty) {
+    this.state.profile.demoDifficulty = d;
+    diffNow = d;
+    // áp dụng ngay cho các phiên đang chạy: bớt số giá thợ săn ảo sắp ra
+    const keep = DIFFICULTY[d].bids;
+    if (keep < 1) {
+      for (const rt of Object.values(this.state.rooms)) {
+        const s = rt.session;
+        if (!s) continue;
+        const done = s.schedule.slice(0, s.schedIdx);
+        const rest = s.schedule.slice(s.schedIdx).filter(() => Math.random() < keep);
+        s.schedule = [...done, ...rest];
+      }
+    }
+    this.changed(true);
+  }
+  demoSetWinChance(p: number) {
+    this.state.profile.demoWinChance = p;
     this.changed(true);
   }
   demoToggleGolden() {

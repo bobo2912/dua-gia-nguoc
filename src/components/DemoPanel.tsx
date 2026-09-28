@@ -14,6 +14,8 @@ export function DemoPanel({ onClose }: { onClose: () => void }) {
   const [confirmReset, setConfirmReset] = useState(false);
   const [checking, setChecking] = useState(false);
   const cur = rankOf(p.huntPoints);
+  const diff = p.demoDifficulty ?? 'normal';
+  const win = p.demoWinChance ?? 0;
   return (
     <Sheet onClose={onClose} label="Công cụ demo">
       <div className="display" style={{ fontSize: 24, fontWeight: 800 }}>
@@ -39,6 +41,41 @@ export function DemoPanel({ onClose }: { onClose: () => void }) {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="card flat" style={{ padding: 14, gap: 10, background: 'var(--honey-soft)', borderColor: 'var(--honey-deep)' }}>
+        <b>Độ khó thợ săn ảo</b>
+        <div className="seg" role="radiogroup" aria-label="Độ khó">
+          {(
+            [
+              ['easy', 'Dễ'],
+              ['normal', 'Vừa'],
+              ['hard', 'Khó'],
+            ] as const
+          ).map(([id, label]) => (
+            <button key={id} role="radio" aria-checked={diff === id} className={diff === id ? 'on' : ''} onClick={() => store.demoSetDifficulty(id)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <span className="xs muted" style={{ lineHeight: 1.5 }}>
+          {diff === 'easy'
+            ? 'Thợ săn ảo ra ít giá hơn một nửa, không trùng giá của bạn, không cướp ngôi, không bắn tỉa giây cuối. Giá thấp của bạn dễ duy nhất hơn nhiều.'
+            : diff === 'hard'
+              ? 'Thợ săn ảo ra nhiều giá hơn, hay trùng đúng giá bạn đang dẫn đầu và bắn tỉa giây cuối nhiều hơn.'
+              : 'Hành vi mặc định: gần với người chơi thật.'}
+        </span>
+        <b style={{ marginTop: 4 }}>Hỗ trợ thắng khi gõ búa</b>
+        <div className="seg" role="radiogroup" aria-label="Tỉ lệ hỗ trợ thắng">
+          {[0, 0.3, 0.6, 1].map((v) => (
+            <button key={v} role="radio" aria-checked={win === v} className={win === v ? 'on' : ''} onClick={() => store.demoSetWinChance(v)}>
+              {v === 0 ? 'Tắt' : v === 1 ? 'Luôn' : `${v * 100}%`}
+            </button>
+          ))}
+        </div>
+        <span className="xs muted" style={{ lineHeight: 1.5 }}>
+          Khi gõ búa, với tỉ lệ đã chọn, giá thấp nhất của bạn được đảm bảo là thấp nhất và duy nhất (chỉ cần bạn đã ra ít nhất 1 giá). Kết quả khi đó có ghi chú "được hỗ trợ".
+        </span>
       </div>
 
       <div className="col" style={{ gap: 8 }}>

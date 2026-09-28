@@ -5,6 +5,8 @@ export type BidStatus = 'leading' | 'unique' | 'dup' | 'pending';
 
 export const ME = 'me';
 
+export type Difficulty = 'easy' | 'normal' | 'hard';
+
 export interface Bid {
   id: string;
   owner: string; // 'me' hoặc id thợ săn ảo
@@ -50,6 +52,8 @@ export interface SessionResult {
   csv: string;
   my: MyFinalBid[];
   nearMiss?: { myPrice: number; diff: number };
+  /** Kết quả có sự can thiệp của công cụ demo */
+  demoBoost?: boolean;
   pointsEarned: number;
 }
 
@@ -140,6 +144,10 @@ export interface Profile {
   reminders: string[];
   secretAlert: boolean;
   demoGolden: boolean;
+  /** Công cụ demo: độ khó thợ săn ảo */
+  demoDifficulty?: Difficulty;
+  /** Công cụ demo: xác suất được hỗ trợ thắng khi gõ búa (0–1) */
+  demoWinChance?: number;
   activeSince: number;
   breakShown: boolean;
 }

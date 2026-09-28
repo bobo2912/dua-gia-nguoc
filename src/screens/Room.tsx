@@ -214,7 +214,7 @@ export function Room({ roomId }: { roomId: string }) {
       {!frozen && (
         <div className="section">
           <div className="card" style={{ padding: 0, overflow: 'hidden', gap: 0 }}>
-            <div className="placeholder-img" style={{ width: '100%', height: 140, borderRadius: 0, border: 'none', borderBottom: '2px dashed var(--honey-deep)', fontSize: 13 }}>
+            <div className="placeholder-img" style={{ width: '100%', height: 110, borderRadius: 0, border: 'none', borderBottom: '2px dashed var(--honey-deep)', fontSize: 13 }}>
               Ảnh quà
             </div>
             <div className="col" style={{ padding: '14px 16px', gap: 4 }}>
@@ -230,6 +230,83 @@ export function Room({ roomId }: { roomId: string }) {
               {allPrizes.length > 1 && <div className="small muted">{allPrizes.length} giá duy nhất thấp nhất lần lượt nhận quà.</div>}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ---------- Ra giá ---------- */}
+      <div className="section">
+        <div
+          className="card"
+          style={{ padding: 14, gap: 10, ...(frozen ? { background: 'rgba(255,246,224,0.06)', borderColor: 'var(--cream)', boxShadow: 'none', color: 'var(--cream)' } : {}) }}
+        >
+          <div className="row between">
+            <h2 className="section-title" style={{ fontSize: 17 }}>
+              Ra giá mới
+            </h2>
+            <span className="xs" style={{ opacity: 0.75 }}>
+              Ví còn <b>{bal}</b> giọt
+            </span>
+          </div>
+          <PriceInput rule={rule} text={priceText} onText={(t) => { setErr(''); setPriceText(t); }} onSubmit={submit} typicalSteps={cfg.bots.typicalSteps} dark={frozen} />
+          <button className="btn big" style={{ height: 48, fontSize: 18 }} onClick={submit} disabled={!canBid}>
+            <IcGavel size={20} color="#1C1712" />
+            Ra giá · 1 giọt mật
+          </button>
+          <div className="xs" style={{ textAlign: 'center', opacity: 0.8, minHeight: 18 }} aria-live="polite">
+            {err ? (
+              <span style={{ color: frozen ? '#FF8A73' : 'var(--dup-text)', fontWeight: 700, fontSize: 13 }}>{err}</span>
+            ) : flash ? (
+              <span style={{ color: frozen ? 'var(--honey)' : 'var(--lead)', fontWeight: 700, fontSize: 13 }}>{flash}</span>
+            ) : bidBlockReason ? (
+              <span style={{ fontWeight: 600 }}>{bidBlockReason}</span>
+            ) : (
+              <>
+                Giá đã ra không rút lại được.
+              </>
+            )}
+          </div>
+          {bal <= 0 && running && (
+            <button className="btn outline sm" onClick={() => nav.go({ name: 'wallet' })}>
+              Kiếm thêm giọt mật
+            </button>
+          )}
+          {!running && (
+            <button
+              className="btn outline sm"
+              onClick={() => {
+                const wasOn = g.state.profile.reminders.includes(roomId);
+                g.toggleReminder(roomId);
+                if (!wasOn) nav.toast('Sẽ nhắc bạn khi tổ mở', 'good');
+              }}
+            >
+              <IcBell color="#1C1712" />
+              {g.state.profile.reminders.includes(roomId) ? 'Đã đặt nhắc' : 'Nhắc tôi khi mở'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ---------- Công cụ ---------- */}
+      {running && (
+        <div className="section" style={{ flexDirection: 'row' }}>
+          {(['scan', 'thermo'] as const).map((k) => {
+            const left = (k === 'scan' ? g.scanQuota(roomId) : cfg.tools.thermo) - s.toolsUsed[k];
+            return (
+              <button
+                key={k}
+                className="card"
+                disabled={frozen || left <= 0}
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: '10px 12px', boxShadow: 'none', textAlign: 'left', minHeight: 72, background: frozen ? 'transparent' : '#fff', color: 'inherit', borderColor: frozen ? 'rgba(255,246,224,0.3)' : 'var(--ink)' }}
+                onClick={() => nav.openTool(k, roomId, price || cfg.bots.typicalSteps * rule.step)}
+              >
+                {k === 'scan' ? <IcSearch /> : <IcThermo />}
+                <span className="col">
+                  <b style={{ fontSize: 14 }}>{k === 'scan' ? 'Soi vùng giá' : 'Nhiệt kế'}</b>
+                  <span className="xs muted">{frozen ? 'Khóa khi đóng băng' : `Còn ${left} lần`}</span>
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -293,78 +370,6 @@ export function Room({ roomId }: { roomId: string }) {
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* ---------- Ra giá ---------- */}
-      <div className="section">
-        <div
-          className="card"
-          style={frozen ? { background: 'rgba(255,246,224,0.06)', borderColor: 'var(--cream)', boxShadow: 'none', color: 'var(--cream)' } : undefined}
-        >
-          <h2 className="section-title" style={{ fontSize: 20 }}>
-            Ra giá mới
-          </h2>
-          <PriceInput rule={rule} text={priceText} onText={(t) => { setErr(''); setPriceText(t); }} onSubmit={submit} typicalSteps={cfg.bots.typicalSteps} dark={frozen} />
-          <button className="btn big" onClick={submit} disabled={!canBid}>
-            <IcGavel color="#1C1712" />
-            Ra giá · 1 giọt mật
-          </button>
-          <div className="xs" style={{ textAlign: 'center', opacity: 0.8, minHeight: 18 }} aria-live="polite">
-            {err ? (
-              <span style={{ color: frozen ? '#FF8A73' : 'var(--dup-text)', fontWeight: 700, fontSize: 13 }}>{err}</span>
-            ) : flash ? (
-              <span style={{ color: frozen ? 'var(--honey)' : 'var(--lead)', fontWeight: 700, fontSize: 13 }}>{flash}</span>
-            ) : bidBlockReason ? (
-              <span style={{ fontWeight: 600 }}>{bidBlockReason}</span>
-            ) : (
-              <>
-                Giá đã ra không rút lại được. Mỗi lần ra giá tốn 1 giọt · ví còn {bal} giọt.
-              </>
-            )}
-          </div>
-          {bal <= 0 && running && (
-            <button className="btn outline sm" onClick={() => nav.go({ name: 'wallet' })}>
-              Kiếm thêm giọt mật
-            </button>
-          )}
-          {!running && (
-            <button
-              className="btn outline sm"
-              onClick={() => {
-                const wasOn = g.state.profile.reminders.includes(roomId);
-                g.toggleReminder(roomId);
-                if (!wasOn) nav.toast('Sẽ nhắc bạn khi tổ mở', 'good');
-              }}
-            >
-              <IcBell color="#1C1712" />
-              {g.state.profile.reminders.includes(roomId) ? 'Đã đặt nhắc' : 'Nhắc tôi khi mở'}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ---------- Công cụ ---------- */}
-      {running && (
-        <div className="section" style={{ flexDirection: 'row' }}>
-          {(['scan', 'thermo'] as const).map((k) => {
-            const left = (k === 'scan' ? g.scanQuota(roomId) : cfg.tools.thermo) - s.toolsUsed[k];
-            return (
-              <button
-                key={k}
-                className="card"
-                disabled={frozen || left <= 0}
-                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: '10px 12px', boxShadow: 'none', textAlign: 'left', minHeight: 72, background: frozen ? 'transparent' : '#fff', color: 'inherit', borderColor: frozen ? 'rgba(255,246,224,0.3)' : 'var(--ink)' }}
-                onClick={() => nav.openTool(k, roomId, price || cfg.bots.typicalSteps * rule.step)}
-              >
-                {k === 'scan' ? <IcSearch /> : <IcThermo />}
-                <span className="col">
-                  <b style={{ fontSize: 14 }}>{k === 'scan' ? 'Soi vùng giá' : 'Nhiệt kế'}</b>
-                  <span className="xs muted">{frozen ? 'Khóa khi đóng băng' : `Còn ${left} lần`}</span>
-                </span>
-              </button>
-            );
-          })}
         </div>
       )}
 

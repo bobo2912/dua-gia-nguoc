@@ -70,7 +70,7 @@ export function PriceInput({ rule, text, onText, onSubmit, typicalSteps, dark }:
     <button
       className="btn outline"
       aria-label={dir > 0 ? `Tăng ${fmtVnd(rule.step)}` : `Giảm ${fmtVnd(rule.step)}`}
-      style={{ width: 52, height: 52, padding: 0, fontSize: 26, background: 'var(--cream)', color: 'var(--ink)', touchAction: 'none', userSelect: 'none' }}
+      style={{ width: 44, height: 44, padding: 0, fontSize: 22, borderRadius: 12, background: 'var(--cream)', color: 'var(--ink)', touchAction: 'none', userSelect: 'none', flexShrink: 0 }}
       onPointerDown={(e) => {
         e.preventDefault();
         startHold(dir);
@@ -90,8 +90,8 @@ export function PriceInput({ rule, text, onText, onSubmit, typicalSteps, dark }:
   );
 
   return (
-    <div className="col" style={{ gap: 12 }}>
-      <div className="row" style={{ gap: 12 }}>
+    <div className="col" style={{ gap: 8 }}>
+      <div className="row" style={{ gap: 8 }}>
         {stepBtn(-1)}
         <label className="grow" style={{ position: 'relative', minWidth: 0 }}>
           <span className="visually-hidden">Giá bạn muốn ra (đồng)</span>
@@ -116,20 +116,20 @@ export function PriceInput({ rule, text, onText, onSubmit, typicalSteps, dark }:
             }}
             style={{
               width: '100%',
-              height: 60,
-              borderRadius: 16,
+              height: 48,
+              borderRadius: 12,
               background: 'var(--honey-soft)',
               border: '2px solid var(--honey-deep)',
               textAlign: 'center',
               fontFamily: 'var(--display)',
-              fontSize: value >= 10_000_000 ? 26 : 32,
+              fontSize: value >= 10_000_000 ? 22 : 26,
               fontWeight: 800,
               color: 'var(--ink)',
               padding: '0 34px 0 10px',
               minWidth: 0,
             }}
           />
-          <span className="display" style={{ position: 'absolute', right: 12, top: 13, fontSize: 24, fontWeight: 800, color: 'var(--honey-text)', pointerEvents: 'none' }}>
+          <span className="display" style={{ position: 'absolute', right: 12, top: 9, fontSize: 20, fontWeight: 800, color: 'var(--honey-text)', pointerEvents: 'none' }}>
             đ
           </span>
         </label>
@@ -145,10 +145,10 @@ export function PriceInput({ rule, text, onText, onSubmit, typicalSteps, dark }:
           step={1}
           value={k}
           onChange={(e) => setK(Number(e.target.value))}
-          style={{ width: '100%', accentColor: '#1C1712', height: 28 }}
+          style={{ width: '100%', accentColor: '#1C1712', height: 22, margin: 0 }}
         />
       </label>
-      <div className="row between xs" style={{ marginTop: -8, opacity: 0.75 }}>
+      <div className="row between xs" style={{ marginTop: -4, opacity: 0.75 }}>
         <span>{fmtVnd(rule.min)}</span>
         <span>
           Bước giá <b>{fmtVnd(rule.step)}</b> · {fmtNum(rule.levels)} mức
@@ -161,7 +161,7 @@ export function PriceInput({ rule, text, onText, onSubmit, typicalSteps, dark }:
           <button
             key={d}
             className="btn outline sm"
-            style={{ flex: 1, height: 40, border: '1.5px solid var(--line)', padding: 0, background: '#fff', color: 'var(--ink)', fontSize: 13 }}
+            style={{ flex: 1, height: 34, border: '1.5px solid var(--line)', padding: 0, background: '#fff', color: 'var(--ink)', fontSize: 12, borderRadius: 10 }}
             onClick={() => stepBy(d)}
           >
             {d > 0 ? '+' : '−'}10 bước
@@ -169,7 +169,7 @@ export function PriceInput({ rule, text, onText, onSubmit, typicalSteps, dark }:
         ))}
         <button
           className="btn outline sm"
-          style={{ flex: 1.2, height: 40, border: '1.5px solid var(--line)', padding: 0, background: '#fff', color: 'var(--ink)', fontSize: 13 }}
+          style={{ flex: 1.2, height: 34, border: '1.5px solid var(--line)', padding: 0, background: '#fff', color: 'var(--ink)', fontSize: 12, borderRadius: 10 }}
           onClick={() => setK(randInt(1, Math.min(rule.levels, typicalSteps * 3)))}
         >
           Ngẫu nhiên

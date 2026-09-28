@@ -62,6 +62,7 @@ Bánh răng ở góc trên sảnh mở bảng công cụ dành cho người th�
 - **Tua nhanh** bất kỳ tổ nào đến sát giai đoạn đóng băng.
 - Cộng giọt mật, cộng điểm Loyalty.
 - Giả lập Hũ mật cho từng tổ, giả lập hạng (Đồng, Bạc, Vàng, Kim Cương).
+- Độ khó thợ săn ảo (Dễ, Vừa, Khó) và Hỗ trợ thắng khi gõ búa (Tắt, 30%, 60%, Luôn).
 - Bật Giờ vàng đổi điểm bất kể giờ thật.
 - Xem màn nhắc nghỉ.
 

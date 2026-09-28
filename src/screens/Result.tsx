@@ -110,6 +110,11 @@ export function Result({ sessionId }: { sessionId: string }) {
             )}
           </div>
         )}
+        {r.demoBoost && (
+          <div className="xs" style={{ textAlign: 'center', fontWeight: 700, color: 'var(--honey-text)' }}>
+            Kết quả được công cụ demo hỗ trợ (bánh răng → Hỗ trợ thắng)
+          </div>
+        )}
         <div className="xs muted" style={{ textAlign: 'center' }}>
           {r.participants.toLocaleString('vi-VN')} thợ săn · {r.totalBids.toLocaleString('vi-VN')} lượt ra giá
         </div>
