@@ -265,3 +265,33 @@ html.standalone .app { bottom: auto; height: var(--app-h, 100vh); }
 html, body, #root, .app { touch-action: manipulation; }
 /* ô nhập dưới 16px khiến iPhone tự phóng to khi bấm vào */
 input, select, textarea { font-size: max(16px, 1em); }
+
+/* ------- Sảnh: danh sách dòng gọn ------- */
+.ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.row-list { background: var(--card); border: 1.5px solid var(--line); border-radius: 18px; overflow: hidden; }
+.room-row {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; min-height: 66px;
+  background: none; border: none; border-bottom: 1px solid var(--line); text-align: left; color: var(--ink);
+}
+.room-row:last-child { border-bottom: none; }
+.room-row:active { background: #FBF6EA; }
+.room-row.jp { background: #FFF6DB; box-shadow: inset 4px 0 0 var(--honey); }
+.jp-strip {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 16px;
+  background: var(--ink); color: var(--cream); border: 2px solid var(--honey); box-shadow: 0 0 18px rgba(245, 179, 1, 0.45);
+}
+.jp-strip .xs.muted { color: #E9DFC9; }
+
+
+
+
+
+
+
+
+
+
+.tab-count { margin-left: 6px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; background: rgba(28, 23, 18, 0.08); }
+.seg button.on .tab-count { background: var(--ink); color: var(--honey); }
+.tab-count.live { background: var(--dup-soft); color: var(--dup-text); }

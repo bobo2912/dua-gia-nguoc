@@ -46,7 +46,7 @@ Workflow nằm ở `.github/workflows/deploy.yml`, tự build và deploy mỗi l
 | Kết quả minh bạch | Biểu đồ phân bố giá, mã SHA-256, tải danh sách giá ẩn danh (.csv) |
 | Soi vùng giá, Nhiệt kế | Soi vùng giá liệt kê 11 mức giá quanh giá định ra, mỗi mức ghi Còn trống hoặc Đã có người chọn, bấm để chọn luôn; Nhiệt kế cho biết giá dẫn đầu ở vùng nào |
 | Điều hướng | Menu dưới luôn hiện, vuốt từ trái sang phải để quay lại (màn hình chạy theo ngón tay), cài được lên màn hình chính với icon con ong |
-| Sảnh | Tổ có Hũ mật được đưa lên đầu với khung vàng phát sáng; mỗi thẻ hiện trị giá quà, bước giá và trạng thái giá của bạn |
+| Sảnh | Dải Hũ mật phát sáng trên cùng; 3 tab Đang mở · Sắp mở · Của tôi; mỗi tổ là một dòng gọn với tên quà, bước giá, số thợ săn, đồng hồ và chấm trạng thái giá của bạn |
 | Ví giọt mật | Kiếm từ giao dịch (mô phỏng), đổi điểm Loyalty, giờ vàng x2, hạn dùng, trần mỗi ngày |
 | Chống cày | Không tính chuyển khoản cho chính mình, giao dịch dưới 50.000đ, vượt giới hạn |
 | Hạng theo mùa | Đồng, Bạc, Vàng, Kim Cương; điểm săn; hạ một bậc khi sang mùa mới |

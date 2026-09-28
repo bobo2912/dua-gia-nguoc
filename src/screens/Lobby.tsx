@@ -1,13 +1,22 @@
-import { ROOMS, type RoomConfig } from '../config';
-import { isFrozen, isRunning, myBids, participantsOf, rankIndex, rankOf, nextRank, visibleStatuses } from '../engine/game';
-import { priceRule } from '../config';
+import { useState } from 'react';
+import { ROOMS, RANKS, priceRule, type RoomConfig, type Prize } from '../config';
+import type { Session } from '../engine/types';
+import { isFrozen, isRunning, myBids, participantsOf, rankIndex, rankOf, visibleStatuses } from '../engine/game';
 import type { GameStore } from '../engine/game';
 import { fmtAgo, fmtClock, fmtVnd } from '../engine/util';
 import { useGame, useNav } from '../nav';
 import { versionLabel } from '../version';
 import { Bee } from '../components/Bee';
-import { BottomNav, PrizeImage } from '../components/common';
-import { HexPattern, HoneyJar, IcBack, IcBell, IcCircle, IcClock, IcCrown, IcDrop, IcFlame, IcGift, IcHex, IcLock, IcSettings, IcSnow, IcUsers, IcX } from '../components/Icons';
+import { BottomNav } from '../components/common';
+import { HexPattern, HoneyJar, IcBack, IcBell, IcClock, IcDrop, IcGift, IcHex, IcLock, IcSettings } from '../components/Icons';
+
+// =====================================================================
+// SẢNH: dải Hũ mật + 3 tab (Đang mở · Sắp mở · Của tôi) + danh sách dòng gọn
+// =====================================================================
+
+type Tab = 'live' | 'soon' | 'mine';
+/** Nhớ tab đang chọn khi đi vào tổ rồi quay lại */
+let lastTab: Tab = 'live';
 
 function heat(g: GameStore, roomId: string, now: number): number {
   const s = g.state.rooms[roomId].session;
@@ -23,63 +32,61 @@ export function Lobby() {
   const p = g.state.profile;
   const rank = rankOf(p.huntPoints);
   const bal = g.balance(now);
-
-  const jackpots = ROOMS.flatMap((cfg) => {
-    const rt = g.state.rooms[cfg.id];
-    const pot = [...(rt.session?.jackpot ?? []), ...rt.pendingJackpot];
-    return pot.length ? [{ cfg, pot, rolls: rt.session?.rolloverCount ?? rt.pendingRollovers }] : [];
-  });
-  const potValue = jackpots.reduce((s, j) => s + j.pot.reduce((a, b) => a + b.valueVnd, 0), 0);
-
-  const jackpotIds = new Set(jackpots.map((j) => j.cfg.id));
-  const running: RoomConfig[] = [];
-  const later: RoomConfig[] = [];
-  for (const cfg of ROOMS) {
-    if (jackpotIds.has(cfg.id)) continue;
-    const s = g.state.rooms[cfg.id].session;
-    if (s && isRunning(s, now) && rankIndex(rank.id) >= rankIndex(cfg.minRank)) running.push(cfg);
-    else later.push(cfg);
-  }
   const pendingPrizes = p.prizes.filter((x) => x.status === 'pending');
+
+  const infos = sortRooms(ROOMS.map((cfg) => roomInfo(g, cfg, now)));
+  const open = useOpenRoom();
+  const groups: Record<Tab, RoomInfo[]> = {
+    live: infos.filter((r) => r.kind === 'running'),
+    soon: infos.filter((r) => r.kind !== 'running'),
+    mine: infos.filter((r) => r.status),
+  };
+  const [tab, setTabState] = useState<Tab>(lastTab);
+  const setTab = (t: Tab) => {
+    lastTab = t;
+    setTabState(t);
+  };
+  const list = groups[tab];
+  const empty: Record<Tab, string> = {
+    live: 'Chưa có tổ nào đang mở. Xem tab Sắp mở để đặt nhắc nhé.',
+    soon: 'Không có tổ nào sắp mở.',
+    mine: 'Bạn chưa ra giá ở tổ nào. Vào một tổ đang mở để bắt đầu săn.',
+  };
 
   return (
     <>
       <div className="scroll">
-        <header className="hdr" style={{ paddingBottom: 24 }}>
+        <header className="hdr" style={{ paddingBottom: 16, gap: 12 }}>
           <HexPattern />
-          <div className="hdr-row" style={{ justifyContent: 'space-between' }}>
+          <div className="hdr-row" style={{ gap: 10 }}>
             <button className="icon-btn" aria-label="Quay lại ngân hàng" onClick={() => nav.toast('Bản demo: nút này sẽ đưa bạn về app ngân hàng.')}>
               <IcBack />
             </button>
-            <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.8 }}>Mini app</div>
+            <Bee size={40} onDark />
+            <div className="col grow">
+              <h1 className="display" style={{ fontSize: 26, lineHeight: 1, fontWeight: 800, color: 'var(--honey)' }}>
+                Đấu giá
+              </h1>
+              <span className="xs" style={{ opacity: 0.8 }}>
+                Mua đồ luxury giá bình dân
+              </span>
+            </div>
             <button className="icon-btn" aria-label="Công cụ demo" onClick={nav.openDemo}>
               <IcSettings />
             </button>
           </div>
-          <div className="hdr-row" style={{ gap: 12 }}>
-            <Bee size={84} gavel="side" onDark />
-            <div className="col">
-              <h1 className="display" style={{ fontSize: 40, lineHeight: 1, fontWeight: 800, color: 'var(--honey)' }}>
-                Đấu giá
-              </h1>
-              <div className="display" style={{ fontSize: 18, lineHeight: 1.2, fontWeight: 600 }}>
-                Mua đồ luxury giá bình dân
-              </div>
-            </div>
-          </div>
           <div className="hdr-row">
-            <button className="chip honey grow" style={{ height: 44, borderRadius: 14, fontSize: 15 }} onClick={() => nav.go({ name: 'wallet' })}>
-              <IcDrop color="#1C1712" />
+            <button className="chip honey grow" style={{ height: 40, borderRadius: 12, fontSize: 14 }} onClick={() => nav.go({ name: 'wallet' })}>
+              <IcDrop size={18} color="#1C1712" />
               {bal} giọt mật
-              <span style={{ marginLeft: 'auto', fontSize: 20, lineHeight: 1 }}>+</span>
+              <span style={{ marginLeft: 'auto', fontSize: 18, lineHeight: 1 }}>+</span>
             </button>
-            <button className="chip ghost grow" style={{ height: 44, borderRadius: 14 }} onClick={() => nav.go({ name: 'rank' })}>
-              <IcHex color={rank.color} />
+            <button className="chip ghost grow" style={{ height: 40, borderRadius: 12, fontSize: 13 }} onClick={() => nav.go({ name: 'rank' })}>
+              <IcHex size={18} color={rank.color} />
               {rank.name} · {rank.bee}
             </button>
           </div>
         </header>
-
         {pendingPrizes.length > 0 && (
           <div className="section">
             <button
@@ -99,51 +106,34 @@ export function Lobby() {
           </div>
         )}
 
-        {jackpots.length > 0 ? (
-          <div className="section">
-            <div className="row" style={{ gap: 10 }}>
-              <div className="pulse" style={{ display: 'flex' }}>
-                <HoneyJar size={34} />
-              </div>
-              <div className="col">
-                <h2 className="section-title">Hũ mật đang dồn</h2>
-                <span className="small" style={{ fontWeight: 700, color: 'var(--honey-text)' }}>
-                  Tổng quà {fmtVnd(potValue)} đang chờ người săn
-                </span>
-              </div>
-            </div>
-            {jackpots.map((j) => (
-              <RoomCard key={j.cfg.id} cfg={j.cfg} now={now} jackpot={{ pot: j.pot, rolls: j.rolls }} />
+        <JackpotStrip infos={infos} />
+
+        <div className="section" style={{ paddingTop: 16 }}>
+          <div className="seg" role="tablist" aria-label="Lọc tổ săn">
+            {(
+              [
+                ['live', 'Đang mở'],
+                ['soon', 'Sắp mở'],
+                ['mine', 'Của tôi'],
+              ] as const
+            ).map(([id, label]) => (
+              <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>
+                {label}
+                <span className={`tab-count ${id === 'live' ? 'live' : ''}`}>{groups[id].length}</span>
+              </button>
             ))}
           </div>
-        ) : (
-          <div className="section">
-            <div className="card flat" style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, background: '#FBF3DD' }}>
-              <HoneyJar size={40} />
-              <div className="col grow" style={{ gap: 2 }}>
-                <b style={{ fontSize: 15 }}>Hũ mật đang trống</b>
-                <span className="small muted">Phiên nào không có giá duy nhất sẽ dồn quà vào đây. Khi có, tổ đó được đưa lên đầu sảnh.</span>
+          <div className="row-list" role="tabpanel">
+            {list.length === 0 && (
+              <div className="col" style={{ alignItems: 'center', textAlign: 'center', padding: 20, gap: 8 }}>
+                <Bee size={52} mood="happy" />
+                <span className="small muted">{empty[tab]}</span>
               </div>
-            </div>
+            )}
+            {list.map((r) => (
+              <RoomRow key={r.cfg.id} r={r} onOpen={open} />
+            ))}
           </div>
-        )}
-
-        <div className="section">
-          <div className="row" style={{ gap: 8 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 5, background: 'var(--dup)' }} className="pulse" />
-            <h2 className="section-title">Đang diễn ra</h2>
-          </div>
-          {running.length === 0 && <div className="small muted">Chưa có tổ nào đang mở. Xem lịch bên dưới nhé.</div>}
-          {running.map((cfg) => (
-            <RoomCard key={cfg.id} cfg={cfg} now={now} />
-          ))}
-        </div>
-
-        <div className="section">
-          <h2 className="section-title">Sắp mở</h2>
-          {later.map((cfg) => (
-            <RoomCard key={cfg.id} cfg={cfg} now={now} />
-          ))}
         </div>
 
         <div className="section">
@@ -189,237 +179,182 @@ export function Lobby() {
   );
 }
 
-function RoomCard({ cfg, now, jackpot }: { cfg: RoomConfig; now: number; jackpot?: { pot: { name: string; valueVnd: number }[]; rolls: number } }) {
-  const card = <RoomCardInner cfg={cfg} now={now} />;
-  if (!jackpot) return card;
-  const total = jackpot.pot.reduce((a, b) => a + b.valueVnd, 0);
+type Tone = 'lead' | 'unique' | 'dup' | 'frozen';
+const TONE_COLORS: Record<Tone, { bg: string; fg: string; dot: string }> = {
+  lead: { bg: 'var(--lead)', fg: '#fff', dot: 'var(--lead)' },
+  unique: { bg: 'var(--honey-soft)', fg: 'var(--honey-text-strong)', dot: 'var(--honey-deep)' },
+  dup: { bg: 'var(--dup-soft)', fg: 'var(--dup-text)', dot: 'var(--dup)' },
+  frozen: { bg: '#E3F1FB', fg: '#1D5B80', dot: '#3C8DC0' },
+};
+
+/** Trạng thái giá của người chơi trong một tổ (null nếu chưa ra giá) */
+function statusOf(g: GameStore, roomId: string, now: number): { tone: Tone; text: string; short: string; n: number } | null {
+  const s = g.state.rooms[roomId].session;
+  if (!s || !myBids(s).length) return null;
+  const st = visibleStatuses(s, now);
+  const lead = st.find((x) => x.status === 'leading');
+  const uniq = st.filter((x) => x.status === 'unique');
+  const n = st.length;
+  if (isFrozen(s, now))
+    return { tone: 'frozen', n, short: 'Đóng băng', text: `Đang đóng băng · ${lead ? `bạn dẫn đầu với ${fmtVnd(lead.bid.price)} lúc đóng băng` : 'chờ gõ búa'}` };
+  if (lead) return { tone: 'lead', n, short: 'Dẫn đầu', text: `Bạn đang dẫn đầu · ${fmtVnd(lead.bid.price)} thấp nhất và duy nhất` };
+  if (uniq.length) return { tone: 'unique', n, short: 'Duy nhất', text: `Có ${uniq.length} giá duy nhất nhưng chưa thấp nhất` };
+  return { tone: 'dup', n, short: 'Bị trùng', text: n === 1 ? 'Giá của bạn đang bị trùng' : `Cả ${n} giá của bạn đều bị trùng` };
+}
+
+type Kind = 'running' | 'upcoming' | 'locked' | 'hidden';
+interface RoomInfo {
+  cfg: RoomConfig;
+  s: Session | null;
+  kind: Kind;
+  jackpot: Prize[];
+  timer: string;
+  parts: number;
+  heat: number;
+  status: ReturnType<typeof statusOf>;
+}
+
+function roomInfo(g: GameStore, cfg: RoomConfig, now: number): RoomInfo {
+  const rt = g.state.rooms[cfg.id];
+  const s = rt.session;
+  const rank = rankOf(g.state.profile.huntPoints);
+  const locked = rankIndex(rank.id) < rankIndex(cfg.minRank);
+  const kind: Kind = locked ? 'locked' : !s ? 'hidden' : isRunning(s, now) ? 'running' : 'upcoming';
+  const timer = !s ? '' : kind === 'running' ? fmtClock(s.endAt - now) : fmtClock(s.startAt - now);
+  return {
+    cfg,
+    s,
+    kind,
+    jackpot: [...(s?.jackpot ?? []), ...rt.pendingJackpot],
+    timer,
+    parts: s ? participantsOf(s) : 0,
+    heat: heat(g, cfg.id, now),
+    status: statusOf(g, cfg.id, now),
+  };
+}
+
+/** Bấm vào một tổ: vào tổ, xem cách lên hạng, hoặc bật báo Tổ Bí Mật */
+function useOpenRoom() {
+  const g = useGame();
+  const nav = useNav();
+  return (r: RoomInfo) => {
+    if (r.kind === 'locked') return nav.go({ name: 'rank' });
+    if (r.kind === 'hidden') {
+      const wasOn = g.state.profile.secretAlert;
+      g.toggleSecretAlert();
+      return nav.toast(wasOn ? 'Đã tắt báo Tổ Bí Mật' : 'Bạn sẽ được báo khi Tổ Bí Mật xuất hiện', 'good');
+    }
+    nav.go({ name: 'room', roomId: r.cfg.id });
+  };
+}
+
+const prizeTitle = (cfg: RoomConfig) => cfg.prizes[0].name + (cfg.prizes.length > 1 ? ` +${cfg.prizes.length - 1}` : '');
+const sortRooms = (xs: RoomInfo[]) => {
+  const w = (r: RoomInfo) => (r.jackpot.length ? 0 : 10) + (r.status ? 0 : 5) + ({ running: 0, upcoming: 1, hidden: 2, locked: 3 } as const)[r.kind];
+  return [...xs].sort((a, b) => w(a) - w(b));
+};
+
+function StatusDot({ status }: { status: RoomInfo['status'] }) {
+  if (!status) return null;
+  const c = TONE_COLORS[status.tone];
   return (
-    <div className="jackpot-frame">
-      <div className="row" style={{ padding: '10px 14px 8px', gap: 10, color: 'var(--cream)' }}>
-        <HoneyJar size={30} />
-        <div className="col grow" style={{ gap: 1 }}>
-          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', color: 'var(--honey)' }}>HŨ MẬT JACKPOT · DỒN {jackpot.rolls} LẦN</span>
-          <span className="display" style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.15 }}>
-            Thêm {fmtVnd(total)} quà: {jackpot.pot.map((x) => x.name.replace(' (dồn)', '')).join(', ')}
-          </span>
-        </div>
-      </div>
-      {card}
-    </div>
+    <span className="row" style={{ gap: 5, fontSize: 12, fontWeight: 700, color: status.tone === 'lead' ? 'var(--lead)' : c.fg }}>
+      <span style={{ width: 8, height: 8, borderRadius: 4, background: c.dot, flexShrink: 0 }} />
+      {status.short}
+    </span>
   );
 }
 
-function RoomCardInner({ cfg, now }: { cfg: RoomConfig; now: number }) {
-  const g = useGame();
-  const nav = useNav();
-  const rt = g.state.rooms[cfg.id];
-  const s = rt.session;
-  const p = g.state.profile;
-  const rank = rankOf(p.huntPoints);
-  const locked = rankIndex(rank.id) < rankIndex(cfg.minRank);
-  const prizeName = cfg.prizes[0].name + (cfg.prizes.length > 1 ? ` + ${cfg.prizes.length - 1} quà khác` : '');
-
-  // Phòng VIP bị khóa theo hạng
-  if (locked) {
-    const need = nextRank(p.huntPoints);
-    const target = need?.minPoints ?? 1;
-    return (
-      <div className="card" style={{ background: '#F3EAD3', boxShadow: 'none' }}>
-        <div className="row between">
-          <span className="badge" style={{ background: 'var(--gold)', color: 'var(--ink)' }}>
-            {cfg.badge} · HẠNG VÀNG
-          </span>
-          <IcLock />
-        </div>
-        <div className="display" style={{ fontSize: 20, lineHeight: 1.15, fontWeight: 700 }}>
-          {prizeName}
-        </div>
-        <div className="small" style={{ fontWeight: 600 }}>
-          Còn {target - p.huntPoints} điểm săn để mở khóa
-        </div>
-        <div style={{ height: 10, borderRadius: 5, background: '#fff', border: '1.5px solid var(--ink)', overflow: 'hidden' }}>
-          <div style={{ width: `${Math.min(100, (p.huntPoints / 1000) * 100)}%`, height: '100%', background: 'var(--gold)' }} />
-        </div>
-        <button className="btn link" style={{ alignSelf: 'flex-start', padding: '8px 0', color: 'var(--honey-text)' }} onClick={() => nav.go({ name: 'rank' })}>
-          Xem cách lên hạng
-        </button>
-      </div>
-    );
-  }
-
-  // Phòng Bí Mật chưa xuất hiện
-  if (cfg.secret && !s) {
-    return (
-      <div className="card" style={{ background: 'var(--ink)', color: 'var(--cream)', boxShadow: '0 4px 0 var(--honey-deep)', flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-        <svg width="64" height="72" viewBox="0 0 64 72" aria-hidden="true">
-          <path d="M32 3l27 15v36L32 69 5 54V18z" fill="none" stroke="#F5B301" strokeWidth="3" />
-          <text x="32" y="47" textAnchor="middle" fontFamily="Baloo 2, sans-serif" fontWeight="800" fontSize="34" fill="#F5B301">
-            ?
-          </text>
-        </svg>
-        <div className="col grow" style={{ gap: 8 }}>
-          <div className="display" style={{ fontSize: 20, fontWeight: 800, color: 'var(--honey)' }}>
-            Tổ Bí Mật
-          </div>
-          <div className="small" style={{ lineHeight: 1.45 }}>
-            Xuất hiện bất ngờ, chỉ báo trước ít phút và kéo dài rất ngắn.
-          </div>
-          <button
-            className="btn sm"
-            style={{ alignSelf: 'flex-start', border: 'none' }}
-            aria-pressed={p.secretAlert}
-            onClick={() => {
-              const wasOn = p.secretAlert;
-              g.toggleSecretAlert();
-              nav.toast(wasOn ? 'Đã tắt báo Tổ Bí Mật' : 'Bạn sẽ được báo khi Tổ Bí Mật xuất hiện', 'good');
-            }}
-          >
-            <IcBell size={16} color="#1C1712" fill={p.secretAlert ? '#1C1712' : 'none'} />
-            {p.secretAlert ? 'Đã bật thông báo' : 'Bật thông báo'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-  if (!s) return null;
-
-  const running = isRunning(s, now);
-  const mine = myBids(s);
-  const parts = participantsOf(s);
-  const seatsLeft = cfg.maxParticipants - parts;
-  const lowSeats = seatsLeft / cfg.maxParticipants < 0.25;
-  const entry = g.canEnter(cfg.id, now);
-  const h = heat(g, cfg.id, now);
-  const upcomingSecret = cfg.secret && !running;
-  const rule = priceRule(cfg);
-
+function RoomIcon({ r, size = 44 }: { r: RoomInfo; size?: number }) {
+  const bg = r.jackpot.length ? 'var(--ink)' : r.kind === 'running' ? 'var(--honey)' : r.kind === 'hidden' ? 'var(--ink)' : '#EFE6D2';
   return (
-    <div className="card" style={upcomingSecret ? { borderColor: 'var(--dup)', boxShadow: '0 4px 0 var(--dup)' } : undefined}>
-      <div className="row between">
-        <span className="badge">
-          {cfg.badge} · {Math.round(cfg.durationSec / 60)} PHÚT
+    <div style={{ width: size, height: size, borderRadius: 12, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: r.jackpot.length ? '2px solid var(--honey)' : 'none' }}>
+      {r.jackpot.length ? (
+        <HoneyJar size={size * 0.62} />
+      ) : r.kind === 'locked' ? (
+        <IcLock size={20} />
+      ) : r.kind === 'hidden' ? (
+        <span className="display" style={{ color: 'var(--honey)', fontSize: 22, fontWeight: 800 }}>
+          ?
         </span>
-        {running ? (
-          h > 0 && (
-            <span className="row" style={{ gap: 2, color: 'var(--dup)', fontSize: 12, fontWeight: 700 }}>
-              {Array.from({ length: h }, (_, i) => (
-                <IcFlame key={i} />
-              ))}
-              {h >= 2 ? 'Sôi động' : 'Đang ấm'}
-            </span>
-          )
-        ) : (
-          <span style={{ fontSize: 13, fontWeight: 700, color: upcomingSecret ? 'var(--dup-text)' : undefined }}>
-            Mở sau {fmtClock(s.startAt - now)}
-          </span>
-        )}
-      </div>
-      <div className="row" style={{ gap: 12 }}>
-        <PrizeImage />
-        <div className="col grow" style={{ gap: 6 }}>
-          <div className="display" style={{ fontSize: 20, lineHeight: 1.15, fontWeight: 700 }}>
-            {prizeName}
-          </div>
-          <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-            <span className="info-chip">
-              Trị giá <b>{fmtVnd(rule.prizeValue)}</b>
-            </span>
-            <span className="info-chip">
-              Bước giá <b>{fmtVnd(rule.step)}</b>
-            </span>
-          </div>
-          {running ? (
-            <div className="row small muted" style={{ gap: 12, fontWeight: 500, flexWrap: 'wrap' }}>
-              <span className="row" style={{ gap: 4 }}>
-                <IcClock color="#C2361F" />
-                <b style={{ color: 'var(--dup)' }}>{fmtClock(s.endAt - now)}</b>
-              </span>
-              <span className="row" style={{ gap: 4 }}>
-                <IcUsers />
-                {parts.toLocaleString('vi-VN')} thợ săn
-              </span>
-            </div>
-          ) : (
-            <div className="small muted">
-              Giá từ {fmtVnd(rule.min)} đến {fmtVnd(rule.max)} · không giới hạn lượt
-            </div>
-          )}
-          {running && lowSeats && (
-            <>
-              <div className="small" style={{ fontWeight: 700, color: 'var(--dup)' }}>
-                Chỉ còn {seatsLeft}/{cfg.maxParticipants} chỗ
-              </div>
-              <div className={`bar ${seatsLeft / cfg.maxParticipants < 0.1 ? 'pulse' : ''}`} style={{ background: 'var(--dup-soft)' }}>
-                <div style={{ width: `${(parts / cfg.maxParticipants) * 100}%`, background: 'var(--dup)' }} />
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-      {mine.length > 0 && <MyStatus roomId={cfg.id} now={now} />}
-      {running ? (
-        entry.ok ? (
-          <button className="btn" onClick={() => nav.go({ name: 'room', roomId: cfg.id })}>
-            {mine.length ? 'Quay lại tổ' : lowSeats ? 'Giành chỗ ngay' : 'Vào tổ săn'}
-          </button>
-        ) : (
-          <button className="btn outline" disabled>
-            {entry.reason} · đợi phiên sau
-          </button>
-        )
       ) : (
-        <button
-          className="btn outline"
-          aria-pressed={p.reminders.includes(cfg.id)}
-          onClick={() => {
-            const wasOn = p.reminders.includes(cfg.id);
-            g.toggleReminder(cfg.id);
-            if (!wasOn) nav.toast(`Sẽ nhắc bạn khi Tổ ${cfg.name} mở`, 'good');
-          }}
-        >
-          <IcBell color="#1C1712" fill={p.reminders.includes(cfg.id) ? '#F5B301' : 'none'} />
-          {p.reminders.includes(cfg.id) ? 'Đã đặt nhắc' : 'Nhắc tôi khi mở'}
-        </button>
+        <IcGift size={22} color="#1C1712" />
       )}
     </div>
   );
 }
 
-/** Trạng thái của người chơi trong tổ, hiện ngay trên thẻ ở sảnh */
-function MyStatus({ roomId, now }: { roomId: string; now: number }) {
-  const g = useGame();
-  const s = g.state.rooms[roomId].session!;
-  const st = visibleStatuses(s, now);
-  const frozen = isFrozen(s, now);
-  const lead = st.find((x) => x.status === 'leading');
-  const uniq = st.filter((x) => x.status === 'unique');
-  const n = st.length;
-  let tone: 'lead' | 'unique' | 'dup' | 'frozen';
-  let text: string;
-  if (frozen) {
-    tone = 'frozen';
-    text = `Đang đóng băng · ${lead ? `bạn dẫn đầu với ${fmtVnd(lead.bid.price)} lúc đóng băng` : 'chờ gõ búa'}`;
-  } else if (lead) {
-    tone = 'lead';
-    text = `Bạn đang dẫn đầu · ${fmtVnd(lead.bid.price)} thấp nhất và duy nhất`;
-  } else if (uniq.length) {
-    tone = 'unique';
-    text = `Có ${uniq.length} giá duy nhất nhưng chưa thấp nhất`;
-  } else {
-    tone = 'dup';
-    text = n === 1 ? 'Giá của bạn đang bị trùng' : `Cả ${n} giá của bạn đều bị trùng`;
-  }
-  const colors = {
-    lead: { bg: 'var(--lead)', fg: '#fff' },
-    unique: { bg: 'var(--honey-soft)', fg: 'var(--honey-text-strong)' },
-    dup: { bg: 'var(--dup-soft)', fg: 'var(--dup-text)' },
-    frozen: { bg: '#E3F1FB', fg: '#1D5B80' },
-  }[tone];
+function Timer({ r }: { r: RoomInfo }) {
+  if (r.kind === 'running')
+    return (
+      <span className="row" style={{ gap: 4, color: 'var(--dup)', fontWeight: 800, fontSize: 15, fontVariantNumeric: 'tabular-nums' }}>
+        <IcClock size={14} color="#C2361F" />
+        {r.timer}
+      </span>
+    );
+  if (r.kind === 'upcoming') return <span className="xs muted" style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>Mở sau {r.timer}</span>;
+  if (r.kind === 'locked') return <span className="xs muted" style={{ fontWeight: 700 }}>Hạng {RANKS.find((x) => x.id === r.cfg.minRank)!.name}</span>;
+  return <span className="xs muted" style={{ fontWeight: 700 }}>Bất ngờ</span>;
+}
+
+function RoomRow({ r, onOpen }: { r: RoomInfo; onOpen: (r: RoomInfo) => void }) {
+  const rule = priceRule(r.cfg);
   return (
-    <div className="row" style={{ background: colors.bg, color: colors.fg, borderRadius: 12, padding: '8px 12px', gap: 8, fontSize: 13, fontWeight: 700 }}>
-      {tone === 'lead' ? <IcCrown size={16} /> : tone === 'dup' ? <IcX size={16} /> : tone === 'frozen' ? <IcSnow size={16} /> : <IcCircle size={16} />}
-      <span className="grow">{text}</span>
-      <span style={{ fontWeight: 600, opacity: 0.85 }}>{n} giá</span>
+    <button className={`room-row ${r.jackpot.length ? 'jp' : ''}`} onClick={() => onOpen(r)}>
+      <RoomIcon r={r} />
+      <div className="col grow" style={{ gap: 2, minWidth: 0 }}>
+        <b className="ellipsis" style={{ fontSize: 15 }}>
+          {prizeTitle(r.cfg)}
+        </b>
+        <span className="xs muted ellipsis">
+          {r.jackpot.length ? <b style={{ color: 'var(--honey-text)' }}>+ Hũ mật · </b> : null}
+          {r.cfg.name} · bước {fmtVnd(rule.step)}
+          {r.kind === 'running' ? ` · ${r.parts} thợ săn` : ''}
+        </span>
+      </div>
+      <div className="col" style={{ alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
+        <Timer r={r} />
+        <StatusDot status={r.status} />
+        {!r.status && <AlertMark r={r} />}
+      </div>
+    </button>
+  );
+}
+
+function JackpotStrip({ infos }: { infos: RoomInfo[] }) {
+  const open = useOpenRoom();
+  const jps = infos.filter((r) => r.jackpot.length);
+  if (!jps.length) return null;
+  return (
+    <div className="section" style={{ paddingTop: 12 }}>
+      {jps.map((r) => (
+        <button key={r.cfg.id} className="jp-strip" onClick={() => open(r)}>
+          <HoneyJar size={30} />
+          <div className="col grow" style={{ gap: 1, minWidth: 0, textAlign: 'left' }}>
+            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--honey)' }}>HŨ MẬT · TỔ {r.cfg.name.toUpperCase()}</span>
+            <b className="ellipsis" style={{ fontSize: 14 }}>
+              Thêm {fmtVnd(r.jackpot.reduce((a, b) => a + b.valueVnd, 0))} quà đang chờ
+            </b>
+          </div>
+          <Timer r={r} />
+        </button>
+      ))}
     </div>
+  );
+}
+
+
+/** Dấu chuông: đã đặt nhắc tổ sắp mở / đã bật báo Tổ Bí Mật */
+function AlertMark({ r }: { r: RoomInfo }) {
+  const g = useGame();
+  const p = g.state.profile;
+  const on = r.kind === 'hidden' ? p.secretAlert : r.kind === 'upcoming' && p.reminders.includes(r.cfg.id);
+  if (r.kind !== 'hidden' && r.kind !== 'upcoming') return null;
+  if (r.kind === 'upcoming' && !on) return null;
+  return (
+    <span className="row" style={{ gap: 4, fontSize: 12, fontWeight: 700, color: on ? 'var(--honey-text)' : 'var(--muted)' }}>
+      <IcBell size={13} color="currentColor" fill={on ? 'currentColor' : 'none'} />
+      {r.kind === 'hidden' ? (on ? 'Đã bật báo' : 'Bấm để bật báo') : 'Đã đặt nhắc'}
+    </span>
   );
 }
