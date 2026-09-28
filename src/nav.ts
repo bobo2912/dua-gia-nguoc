@@ -18,6 +18,8 @@ export interface Nav {
   back: () => void;
   openBank: (id: EarnActionId) => void;
   openDemo: () => void;
+  /** Mở hướng dẫn luật chơi */
+  openGuide: () => void;
   openTool: (kind: 'scan' | 'thermo', roomId: string, center: number) => void;
   toast: (text: string, tone?: 'good' | 'warn' | 'info') => void;
   /** Kiểm tra bản mới trên máy chủ; hiện nút cập nhật nếu có */

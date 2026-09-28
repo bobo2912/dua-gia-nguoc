@@ -16,6 +16,7 @@ import { DemoPanel } from './components/DemoPanel';
 import { ToolSheet } from './components/ToolSheet';
 import { GavelOverlay } from './components/GavelOverlay';
 import { BreakModal } from './components/BreakModal';
+import { GuideModal, guideSeen } from './components/GuideModal';
 import { Toasts, type ToastItem } from './components/Toasts';
 import { applyUpdate, checkForUpdate, type UpdateInfo } from './version';
 
@@ -31,6 +32,8 @@ export default function App() {
   const [outbid, setOutbid] = useState<OutbidData | null>(null);
   const [bank, setBank] = useState<EarnActionId | null>(null);
   const [demo, setDemo] = useState(false);
+  // Hướng dẫn luật chơi: tự bật lần đầu mở app
+  const [guide, setGuide] = useState(() => !guideSeen());
   const [tool, setTool] = useState<{ kind: 'scan' | 'thermo'; roomId: string; center: number } | null>(null);
   const [gavel, setGavel] = useState<{ sessionId: string; won: boolean } | null>(null);
   const [brk, setBrk] = useState(false);
@@ -107,7 +110,7 @@ export default function App() {
 
   // Vuốt từ trái sang phải để quay lại: màn hình chạy theo ngón tay
   const touch = useRef<{ x: number; y: number; t: number; ok: boolean; drag: boolean; dx: number } | null>(null);
-  const overlayOpen = !!(outbid || bank || demo || tool || gavel || brk);
+  const overlayOpen = !!(outbid || bank || demo || tool || gavel || brk || guide);
   const onTouchStart = (e: TouchEvent) => {
     const p = e.touches[0];
     const target = e.target as HTMLElement;
@@ -244,6 +247,7 @@ export default function App() {
     back,
     openBank: setBank,
     openDemo: () => setDemo(true),
+    openGuide: () => setGuide(true),
     openTool: (kind, roomId, center) => setTool({ kind, roomId, center }),
     toast: (text, tone = 'info') => pushToast({ text, tone }),
   };
@@ -311,6 +315,7 @@ export default function App() {
           />
         )}
         {brk && <BreakModal onClose={() => setBrk(false)} />}
+        {guide && <GuideModal onClose={() => setGuide(false)} />}
         {update && !overlayOpen && (
           <div className="update-bar" role="status">
             <div className="col grow" style={{ gap: 1 }}>

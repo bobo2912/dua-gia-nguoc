@@ -154,6 +154,8 @@ export function DemoPanel({ onClose }: { onClose: () => void }) {
                 store.reset();
                 nav.go({ name: 'lobby' });
                 onClose();
+                // chơi lại như người mới: hiện lại hướng dẫn
+                nav.openGuide();
               }}
             >
               Xóa và chơi lại

@@ -146,6 +146,9 @@ export function Room({ roomId }: { roomId: string }) {
               Tổ săn #{s.no}
             </span>
           </div>
+          <button className="icon-btn help-btn" aria-label="Luật chơi và hướng dẫn" onClick={nav.openGuide}>
+            ?
+          </button>
           {frozen ? (
             <span className="pill" style={{ background: 'var(--dup)', color: '#fff', fontSize: 12, letterSpacing: '0.06em' }}>
               {cfg.freezeSec} GIÂY CUỐI

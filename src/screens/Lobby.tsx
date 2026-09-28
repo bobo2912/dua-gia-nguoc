@@ -63,14 +63,17 @@ export function Lobby() {
               <IcBack />
             </button>
             <Bee size={40} onDark />
-            <div className="col grow">
+            <div className="col grow" style={{ minWidth: 0 }}>
               <h1 className="display" style={{ fontSize: 26, lineHeight: 1, fontWeight: 800, color: 'var(--honey)' }}>
                 Đấu giá
               </h1>
-              <span className="xs" style={{ opacity: 0.8 }}>
+              <span className="xs ellipsis" style={{ opacity: 0.8 }}>
                 Mua đồ luxury giá bình dân
               </span>
             </div>
+            <button className="icon-btn help-btn" aria-label="Luật chơi và hướng dẫn" onClick={nav.openGuide}>
+              ?
+            </button>
             <button className="icon-btn" aria-label="Công cụ demo" onClick={nav.openDemo}>
               <IcSettings />
             </button>

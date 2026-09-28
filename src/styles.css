@@ -295,3 +295,15 @@ input, select, textarea { font-size: max(16px, 1em); }
 .tab-count { margin-left: 6px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; background: rgba(28, 23, 18, 0.08); }
 .seg button.on .tab-count { background: var(--ink); color: var(--honey); }
 .tab-count.live { background: var(--dup-soft); color: var(--dup-text); }
+
+/* ------- hướng dẫn luật chơi ------- */
+.help-btn { font-family: var(--display); font-size: 21px; font-weight: 800; line-height: 1; }
+.guide { align-items: center; z-index: 70; }
+.guide-card { height: min(600px, calc(var(--app-h, 100vh) - 40px - env(safe-area-inset-top, 0px))); gap: 12px; }
+.guide-card > * { flex-shrink: 0; }
+.guide-card > .guide-body { flex-shrink: 1; }
+.guide-body { overflow-y: auto; min-height: 0; flex: 1 1 auto; animation: guide-in 0.25s ease; padding: 2px; }
+.guide-body p { margin: 0; }
+.guide-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 4px; padding: 0; border: none; background: #d6c9ae; transition: width 0.2s ease; }
+.guide-dot[data-on='true'] { width: 22px; background: var(--ink); }
+@keyframes guide-in { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
