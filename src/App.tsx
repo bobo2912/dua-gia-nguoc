@@ -18,7 +18,7 @@ import { GavelOverlay } from './components/GavelOverlay';
 import { BreakModal } from './components/BreakModal';
 import { GuideModal, guideSeen } from './components/GuideModal';
 import { Toasts, type ToastItem } from './components/Toasts';
-import { applyUpdate, checkForUpdate, type UpdateInfo } from './version';
+import { applyUpdate, autoUpdateOnce, checkForUpdate, type UpdateInfo } from './version';
 
 export default function App() {
   // Ngăn xếp màn hình: mỗi mục có id riêng để React giữ nguyên màn khi lướt quay lại
@@ -222,9 +222,11 @@ export default function App() {
   }, [go, pushToast]);
 
   const checkUpdate = useCallback(
-    async (manual = false) => {
+    async (manual = false, auto = false) => {
       const r = await checkForUpdate();
       if (r && r !== 'unavailable') {
+        // lúc vừa mở app / quay lại app: tự tải bản mới luôn, không hỏi
+        if (auto && autoUpdateOnce(r)) return;
         setUpdate(r);
         if (manual) pushToast({ tone: 'good', text: `Đã có bản mới v${r.version} · ${r.build}` });
       } else if (manual) {
@@ -236,9 +238,9 @@ export default function App() {
 
   // Tự kiểm tra bản mới khi mở app, mỗi 2 phút và mỗi khi quay lại app
   useEffect(() => {
-    checkUpdate();
+    checkUpdate(false, true);
     const t = window.setInterval(() => checkUpdate(), 120000);
-    const onVis = () => document.visibilityState === 'visible' && checkUpdate();
+    const onVis = () => document.visibilityState === 'visible' && checkUpdate(false, true);
     document.addEventListener('visibilitychange', onVis);
     return () => {
       window.clearInterval(t);

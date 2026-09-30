@@ -4,6 +4,7 @@ import './styles.css';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { store } from './engine/game';
+import { refreshLaunchCache } from './version';
 
 // Mở ?debug trên URL để truy cập engine từ console trình duyệt (phục vụ kiểm thử)
 if (location.search.includes('debug')) (window as unknown as { __store: unknown }).__store = store;
@@ -78,6 +79,10 @@ window.addEventListener('wheel', (e) => e.ctrlKey && e.preventDefault(), { passi
 window.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && ['+', '-', '=', '0'].includes(e.key)) e.preventDefault();
 });
+
+// Luôn mở bản mới nhất khi bấm icon trên màn hình chính:
+// làm mới bộ nhớ đệm của trang gốc + đăng ký service worker (chỉ khi chạy trên https)
+window.setTimeout(refreshLaunchCache, 1500);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
