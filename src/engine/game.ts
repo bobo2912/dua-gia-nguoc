@@ -347,6 +347,12 @@ export class GameStore {
     const rt = this.state.rooms[cfg.id];
     // Phòng Bí Mật: chỉ tạo phiên khi đến lịch ẩn
     if (cfg.secret && !rt.session) {
+      // Vắng mặt lâu: lịch đã trôi qua thì dời sang lượt kế tiếp tính từ bây giờ, không "phát lại" các phiên cũ
+      if (rt.nextSecretAt && now > rt.nextSecretAt + 1000) {
+        rt.nextSecretAt = now + randInt(60, cfg.secret.everySec) * 1000;
+        this.changed(true);
+        return;
+      }
       if (rt.nextSecretAt && now >= rt.nextSecretAt - cfg.secret.announceSec * 1000) {
         rt.seq++;
         rt.session = newSession(cfg, rt.seq, rt.nextSecretAt, rt.pendingJackpot, rt.pendingRollovers);
@@ -367,13 +373,16 @@ export class GameStore {
       }
       if (!s.openedNotified) {
         s.openedNotified = true;
-        const p = this.state.profile;
-        if (p.reminders.includes(cfg.id)) {
-          p.reminders = p.reminders.filter((x) => x !== cfg.id);
-          this.emit({ type: 'toast', tone: 'info', roomId: cfg.id, text: `Tổ ${cfg.name} đã mở. Vào săn ngay!` });
-        }
-        if (cfg.secret && p.secretAlert) {
-          this.emit({ type: 'toast', tone: 'warn', roomId: cfg.id, text: 'Tổ Bí Mật đã mở, chỉ trong ít phút!' });
+        // phiên đã kết thúc (do app đóng lâu) thì không báo "đã mở" nữa
+        if (now < s.endAt) {
+          const p = this.state.profile;
+          if (p.reminders.includes(cfg.id)) {
+            p.reminders = p.reminders.filter((x) => x !== cfg.id);
+            this.emit({ type: 'toast', tone: 'info', roomId: cfg.id, text: `Tổ ${cfg.name} đã mở. Vào săn ngay!` });
+          }
+          if (cfg.secret && p.secretAlert) {
+            this.emit({ type: 'toast', tone: 'warn', roomId: cfg.id, text: 'Tổ Bí Mật đã mở, chỉ trong ít phút!' });
+          }
         }
       }
       this.runSession(cfg, s, Math.min(now, s.endAt - 1), dt);
@@ -381,7 +390,7 @@ export class GameStore {
         this.resolve(cfg, rt, s);
         if (cfg.secret) {
           rt.session = null;
-          rt.nextSecretAt = s.endAt + cfg.secret.everySec * 1000;
+          rt.nextSecretAt = Math.max(s.endAt, now) + cfg.secret.everySec * 1000;
           return;
         }
         rt.seq++;
