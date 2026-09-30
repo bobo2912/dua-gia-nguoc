@@ -155,9 +155,15 @@ export default function App() {
     }
   };
 
+  const recentToasts = useRef<Map<string, number>>(new Map());
   const pushToast = useCallback((t: Omit<ToastItem, 'id'>) => {
+    // Chống lặp: cùng một nội dung chỉ hiện 1 lần trong 20 giây
+    const now = Date.now();
+    const last = recentToasts.current.get(t.text);
+    if (last && now - last < 20000) return;
+    recentToasts.current.set(t.text, now);
     const id = Math.random().toString(36).slice(2);
-    setToasts((xs) => [{ ...t, id }, ...xs].slice(0, 3));
+    setToasts((xs) => [{ ...t, id }, ...xs].slice(0, 2));
     window.setTimeout(() => setToasts((xs) => xs.filter((x) => x.id !== id)), 3000);
   }, []);
 
