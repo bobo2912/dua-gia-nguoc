@@ -314,14 +314,12 @@ export const THRONE = {
 export type SurpriseKind = 'night' | 'reveal' | 'rain';
 export const SURPRISE = {
   enabled: true,
-  /** Phòng dài từ ngưỡng này (giây) có 2 sự kiện mỗi phiên, ngắn hơn thì 1 */
-  twoEventsFromSec: 240,
-  /** Không xảy ra trong khoảng đầu phiên (tỷ lệ thời lượng) */
-  notBeforeRatio: 0.2,
+  /** Sự kiện nối tiếp nhau suốt phiên, không giới hạn số lần. Sự kiện đầu tiên đến sau khoảng này (tỷ lệ thời lượng phiên) */
+  notBeforeRatio: 0.12,
   /** Phải kết thúc trước giai đoạn đóng băng ít nhất (giây) */
   endBeforeFreezeSec: 6,
-  /** Khoảng nghỉ tối thiểu giữa hai sự kiện (giây) */
-  gapSec: 10,
+  /** Khoảng nghỉ ngẫu nhiên giữa hai sự kiện liên tiếp [min, max] (giây). Bản demo rút ngắn */
+  gapSec: [10, 30] as [number, number],
   night: { durationSec: 20, name: 'Màn đêm', desc: 'Mọi trạng thái bị ẩn. Ai cũng phải ra giá mù!' },
   reveal: { durationSec: 25, levels: 11, name: 'Hé lộ', desc: 'Hệ thống công bố một vùng giá đang có nhiều giá trùng.' },
   rain: { durationSec: 30, pointsPerBid: 5, name: 'Mưa điểm', desc: 'Mỗi giá ra trong lúc mưa được thêm điểm săn.' },

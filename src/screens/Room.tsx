@@ -218,21 +218,6 @@ export function Room({ roomId }: { roomId: string }) {
         )}
       </header>
 
-      {/* ---------- Sự kiện bất ngờ ---------- */}
-      {ev ? (
-        <div className="section">
-          <EventBanner s={s} now={now} myBidPrices={new Set(mine.map((b) => b.price))} />
-        </div>
-      ) : (
-        running &&
-        !frozen &&
-        nextEvent(s, now) && (
-          <div className="section">
-            <NextEventStrip s={s} now={now} />
-          </div>
-        )
-      )}
-
       {/* ---------- Đóng băng ---------- */}
       {frozen && (
         <div className="section">
@@ -323,6 +308,21 @@ export function Room({ roomId }: { roomId: string }) {
           )}
         </div>
       </div>
+
+      {/* ---------- Sự kiện bất ngờ ---------- */}
+      {ev ? (
+        <div className="section">
+          <EventBanner s={s} now={now} myBidPrices={new Set(mine.map((b) => b.price))} />
+        </div>
+      ) : (
+        running &&
+        !frozen &&
+        nextEvent(s, now) && (
+          <div className="section">
+            <NextEventStrip s={s} now={now} />
+          </div>
+        )
+      )}
 
       {/* ---------- Công cụ ---------- */}
       {running && (

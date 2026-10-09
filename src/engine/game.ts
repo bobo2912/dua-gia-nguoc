@@ -130,23 +130,27 @@ const eventOn = (s: Session, now: number, kind: SurpriseKind) => (s.events ?? []
 export const isNight = (s: Session, now: number) => eventOn(s, now, 'night');
 export const isRain = (s: Session, now: number) => eventOn(s, now, 'rain');
 
-/** Lên lịch sự kiện bất ngờ cho một phiên: rải đều trong khoảng giữa phiên, không chồng lên nhau */
+/**
+ * Lên lịch sự kiện bất ngờ cho một phiên: nối tiếp nhau đến hết phiên, không giới hạn số lần.
+ * Loại sự kiện ngẫu nhiên (không lặp lại liền nhau), khoảng nghỉ ngẫu nhiên, luôn xong trước giai đoạn đóng băng.
+ */
 function planEvents(cfg: RoomConfig, startAt: number, endAt: number): SurpriseEvent[] {
   if (!SURPRISE.enabled || cfg.surprises === false) return [];
-  const n = cfg.durationSec >= SURPRISE.twoEventsFromSec ? 2 : 1;
-  const from = startAt + cfg.durationSec * 1000 * SURPRISE.notBeforeRatio;
+  const all: SurpriseKind[] = ['night', 'reveal', 'rain'];
+  const dur = (k: SurpriseKind) => SURPRISE[k].durationSec * 1000;
+  const [gMin, gMax] = SURPRISE.gapSec;
   const to = endAt - (cfg.freezeSec + SURPRISE.endBeforeFreezeSec) * 1000;
-  const kinds = (['night', 'reveal', 'rain'] as SurpriseKind[]).sort(() => Math.random() - 0.5).slice(0, n);
-  const slot = (to - from) / n;
+  let t = startAt + cfg.durationSec * 1000 * SURPRISE.notBeforeRatio + rand(0, gMin) * 1000;
+  let prev: SurpriseKind | null = null;
   const out: SurpriseEvent[] = [];
-  kinds.forEach((kind, i) => {
-    const d = SURPRISE[kind].durationSec * 1000;
-    const lo = from + i * slot;
-    const hi = lo + slot - d - (i < n - 1 ? SURPRISE.gapSec * 1000 : 0);
-    if (hi < lo) return;
-    const at = rand(lo, hi);
-    out.push({ id: uid('ev'), kind, at, until: at + d, started: false });
-  });
+  for (let guard = 0; guard < 200; guard++) {
+    const fit = all.filter((k) => k !== prev && t + dur(k) <= to);
+    if (!fit.length) break;
+    const kind = pick(fit);
+    out.push({ id: uid('ev'), kind, at: t, until: t + dur(kind), started: false });
+    prev = kind;
+    t += dur(kind) + rand(gMin, gMax) * 1000;
+  }
   return out;
 }
 
@@ -1294,7 +1298,7 @@ export class GameStore {
     if (now + d > freezeAt) return 'Không đủ thời gian trước giai đoạn đóng băng';
     // kết thúc sự kiện đang chạy, bỏ các sự kiện sắp tới bị chồng lên
     for (const e of s.events) if (e.started && !e.ended && now < e.until) e.until = now;
-    s.events = s.events.filter((e) => e.started || e.at > now + d + SURPRISE.gapSec * 1000);
+    s.events = s.events.filter((e) => e.started || e.at > now + d + SURPRISE.gapSec[0] * 1000);
     const ev: SurpriseEvent = { id: uid('ev'), kind, at: now, until: now + d, started: false };
     s.events.push(ev);
     s.events.sort((a, b) => a.at - b.at);
