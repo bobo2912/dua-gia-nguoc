@@ -446,13 +446,13 @@ input, select, textarea { font-size: max(16px, 1em); }
 
 /* ------- Đóng băng: đồng hồ nổi + viền đỏ ------- */
 .float-clock {
-  position: absolute; z-index: 25; top: calc(env(safe-area-inset-top, 0px) + 10px); left: 50%; transform: translateX(-50%);
+  position: absolute; z-index: 25; bottom: 14px; left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 10px; padding: 8px 18px 12px 10px; border-radius: 999px; overflow: hidden;
   background: linear-gradient(180deg, #e0452b, #a42a15); color: #fff6e0; border: 2px solid #ffb8a8;
   box-shadow: 0 8px 24px rgba(164, 42, 21, 0.55), 0 0 0 0 rgba(224, 69, 43, 0.6);
   animation: fc-in 0.35s cubic-bezier(0.3, 1.4, 0.5, 1) both, fc-ping 1s ease-out infinite;
 }
-@keyframes fc-in { from { transform: translateX(-50%) translateY(-120%) scale(0.8); } to { transform: translateX(-50%); } }
+@keyframes fc-in { from { transform: translateX(-50%) translateY(140%) scale(0.8); } to { transform: translateX(-50%); } }
 @keyframes fc-ping { 0% { box-shadow: 0 8px 24px rgba(164, 42, 21, 0.55), 0 0 0 0 rgba(224, 69, 43, 0.7); } 100% { box-shadow: 0 8px 24px rgba(164, 42, 21, 0.55), 0 0 0 16px rgba(224, 69, 43, 0); } }
 .fc-gavel { width: 34px; height: 34px; border-radius: 17px; background: rgba(0, 0, 0, 0.22); display: flex; align-items: center; justify-content: center; animation: fc-knock 1s ease-in-out infinite; transform-origin: 70% 70%; }
 @keyframes fc-knock { 0%, 60%, 100% { transform: rotate(0); } 75% { transform: rotate(-35deg); } 88% { transform: rotate(8deg); } }
@@ -474,3 +474,10 @@ input, select, textarea { font-size: max(16px, 1em); }
 .flip-row.uniq { background: rgba(245, 179, 1, 0.12); border-color: rgba(245, 179, 1, 0.45); }
 .flip-row.uniq .flip-price { color: var(--cream); }
 .flip-badge.uniq { background: rgba(245, 179, 1, 0.2); color: var(--honey); }
+/* Đồng hồ trong tiêu đề ô Ra giá khi đóng băng */
+.bid-clock { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px 4px 9px; border-radius: 999px; background: linear-gradient(180deg, #e0452b, #a42a15); color: #fff6e0; box-shadow: 0 0 0 0 rgba(224, 69, 43, 0.6); animation: fc-ping 1s ease-out infinite; }
+.bc-label { font-size: 10.5px; font-weight: 800; letter-spacing: 0.1em; white-space: nowrap; }
+.bc-time { font-size: 22px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; animation: fc-tick 1s ease both; }
+.bid-clock.hot { animation-duration: 0.6s; }
+.bid-clock.critical { background: linear-gradient(180deg, #ff3b1f, #8f1c0b); animation: fc-ping 0.5s ease-out infinite, fc-shake 0.3s ease-in-out infinite; }
+.bid-clock.critical .bc-time { color: #ffe7a3; font-size: 24px; }

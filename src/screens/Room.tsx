@@ -46,7 +46,10 @@ export function Room({ roomId }: { roomId: string }) {
   const checkRing = () => {
     const r = ringRef.current?.getBoundingClientRect();
     const sc = scRef.current?.getBoundingClientRect();
-    setRingHidden(!!r && !!sc && r.bottom < sc.top + 60);
+    const clock = scRef.current?.querySelector('.bid-clock')?.getBoundingClientRect();
+    // Ô Ra giá đã có đồng hồ riêng: chỉ hiện đồng hồ nổi (ở đáy màn hình) khi cả vòng đếm lớn lẫn đồng hồ trong ô Ra giá đều khuất
+    const clockHidden = !clock || !sc || clock.bottom < sc.top + 4 || clock.top > sc.bottom - 4;
+    setRingHidden(!!r && !!sc && r.bottom < sc.top + 60 && clockHidden);
   };
 
   // nhận giá được chọn từ Soi vùng giá
@@ -65,7 +68,7 @@ export function Room({ roomId }: { roomId: string }) {
           const v = sc.getBoundingClientRect();
           const hidden = c.top < v.top || c.bottom > v.bottom;
           if (hidden) {
-            const gap = sc.classList.contains('frozen') ? 84 : 12;
+            const gap = 12;
             sc.scrollTo({ top: Math.max(0, c.top - v.top + sc.scrollTop - gap), behavior: 'smooth' });
           }
         }, 50);
@@ -138,7 +141,7 @@ export function Room({ roomId }: { roomId: string }) {
       const sc = card?.closest('.scroll') as HTMLElement | null;
       if (!card || !sc) return;
       // Đang đóng băng: chừa chỗ cho đồng hồ nổi phía trên để không che ô nhập giá
-      const gap = sc.classList.contains('frozen') ? 84 : 12;
+      const gap = 12;
       const top = card.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - gap;
       sc.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
     }, delay);
@@ -308,11 +311,29 @@ export function Room({ roomId }: { roomId: string }) {
           style={{ padding: 12, gap: 8, ...(frozen || night ? { background: 'rgba(255,246,224,0.06)', borderColor: 'var(--cream)', boxShadow: 'none', color: 'var(--cream)' } : {}) }}
         >
           <div className="row between">
-            <h2 className="section-title" style={{ fontSize: 16 }}>
-              Ra giá mới
-            </h2>
+            {frozen ? (
+              <span className={`bid-clock ${remaining <= 10000 ? 'hot' : ''} ${remaining <= 5000 ? 'critical' : ''}`} role="timer" aria-label={`Búa sắp gõ, còn ${fmtClock(remaining)}`}>
+                <IcGavel size={16} color="#FFF6E0" />
+                <span className="bc-label">BÚA SẮP GÕ</span>
+                <span key={secLeft} className="display bc-time">
+                  {fmtClock(remaining)}
+                </span>
+              </span>
+            ) : (
+              <h2 className="section-title" style={{ fontSize: 16 }}>
+                Ra giá mới
+              </h2>
+            )}
             <span className="xs" style={{ opacity: 0.75 }}>
-              Bước {fmtVnd(rule.step)} · ví còn <b>{bal}</b> giọt
+              {frozen ? (
+                <>
+                  Ví <b>{bal}</b> giọt
+                </>
+              ) : (
+                <>
+                  Bước {fmtVnd(rule.step)} · ví còn <b>{bal}</b> giọt
+                </>
+              )}
             </span>
           </div>
           <PriceInput rule={rule} text={priceText} onText={(t) => { setErr(''); setPriceText(t); }} onSubmit={submit} typicalSteps={cfg.bots.typicalSteps} dark={frozen || night} onFocus={() => scrollBidToTop(350)} />
