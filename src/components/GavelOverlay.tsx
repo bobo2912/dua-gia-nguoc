@@ -54,13 +54,16 @@ export function buildSteps(r: SessionResult): Step[] {
 }
 
 /** Thời gian chờ trước khi lật bước này (ms) */
-function delayOf(st: Step): number {
+function delayOf(st: Step, firstWin: boolean): number {
   if (st.kind === 'skip') return 850;
-  if (st.winIdx !== null) return 1500;
+  if (st.winIdx !== null) return firstWin ? DRUM_MS : 1500;
   if (st.drum) return 1050;
   if (st.mine) return 900;
   return 520;
 }
+
+/** Hồi trống trước lá thắng đầu tiên: đếm 3 – 2 – 1 */
+const DRUM_MS = 2700;
 
 export function GavelOverlay({
   sessionId,
@@ -83,6 +86,9 @@ export function GavelOverlay({
   const [shown, setShown] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const finished = shown >= steps.length;
+  const firstWinPos = steps.findIndex((st) => st.kind === 'level' && st.winIdx !== null);
+  /** Lá sắp lật là lá thắng đầu tiên: dành một hồi trống */
+  const firstWinNext = !finished && shown === firstWinPos;
 
   // Búa gõ và màn lật bài hiện cùng lúc, để người chơi biết kết quả đang được công bố
   useEffect(() => {
@@ -113,9 +119,26 @@ export function GavelOverlay({
           /* bỏ qua */
         }
       }
-    }, shown === 0 ? (replay ? 300 : 650) : delayOf(steps[shown]));
+    }, firstWinNext ? DRUM_MS : shown === 0 ? (replay ? 300 : 650) : delayOf(steps[shown], false));
     return () => window.clearTimeout(t);
-  }, [r, shown, steps, replay]);
+  }, [r, shown, steps, replay, firstWinNext]);
+
+  // Đếm 3 – 2 – 1 trên lá úp trước khi lật lá thắng đầu tiên
+  const [drum, setDrum] = useState(0);
+  useEffect(() => {
+    if (!firstWinNext) {
+      setDrum(0);
+      return;
+    }
+    setDrum(3);
+    const per = DRUM_MS / 3;
+    const t1 = window.setTimeout(() => setDrum(2), per);
+    const t2 = window.setTimeout(() => setDrum(1), per * 2);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [firstWinNext, shown]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -152,7 +175,8 @@ export function GavelOverlay({
   const myUniqueAbove = r.my.filter((m) => m.status === 'unique');
 
   let caption = 'Lật từ giá thấp nhất. Mức nào trùng sẽ bị loại…';
-  if (nextStep?.kind === 'level' && nextStep.winIdx !== null) caption = 'Hồi hộp quá… mức tiếp theo là?';
+  if (firstWinNext) caption = shown === 0 ? 'Mức thấp nhất của phiên… có ai trùng không?' : 'Mức tiếp theo… có ai trùng không?';
+  else if (nextStep?.kind === 'level' && nextStep.winIdx !== null) caption = 'Còn một phần quà nữa…';
   else if (nextStep?.kind === 'level' && nextStep.drum) caption = 'Sắp tới rồi…';
   else if (lastShown?.kind === 'level' && lastShown.mine && lastShown.winIdx === null) caption = 'Giá của bạn bị trùng mất rồi!';
   if (finished) {
@@ -164,7 +188,7 @@ export function GavelOverlay({
           : 'Phiên này chưa phải của bạn.'
         : 'Không có giá duy nhất nào!';
   }
-  const mood = finished ? (iWon ? 'joy' : myUniqueAbove.length ? 'shock' : 'worried') : nextStep?.kind === 'level' && nextStep.winIdx !== null ? 'shock' : 'determined';
+  const mood = finished ? (iWon ? 'joy' : myUniqueAbove.length ? 'shock' : 'worried') : firstWinNext ? 'shock' : 'determined';
 
   return (
     <div className={`gavel-stage flip-stage ${finished && iWon ? 'won' : ''}`} role="dialog" aria-label="Lật bài kết quả">
@@ -228,8 +252,14 @@ export function GavelOverlay({
           ),
         )}
         {nextStep && (
-          <div className={`flip-row facedown ${nextStep.kind === 'level' && nextStep.winIdx !== null ? 'tense' : ''}`} aria-hidden="true">
-            <span className="display flip-price">? ? ?</span>
+          <div className={`flip-row facedown ${firstWinNext ? 'tense drum' : ''}`} aria-hidden="true">
+            {firstWinNext && drum > 0 ? (
+              <span key={drum} className="display drum-num">
+                {drum}
+              </span>
+            ) : (
+              <span className="display flip-price">? ? ?</span>
+            )}
           </div>
         )}
       </div>

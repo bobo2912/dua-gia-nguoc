@@ -201,7 +201,7 @@ export function Room({ roomId }: { roomId: string }) {
               <span className="small" style={{ opacity: 0.8 }}>
                 {running ? 'Búa gõ sau' : 'Tổ mở sau'}
               </span>
-              <span className="display" style={{ fontSize: 52, lineHeight: 1, fontWeight: 800, color: 'var(--honey)' }} role="timer">
+              <span className="display" style={{ fontSize: 40, lineHeight: 1, fontWeight: 800, color: 'var(--honey)' }} role="timer">
                 {fmtClock(running ? remaining : s.startAt - now)}
               </span>
             </div>
@@ -233,21 +233,28 @@ export function Room({ roomId }: { roomId: string }) {
       {/* ---------- Quà ---------- */}
       {!frozen && (
         <div className="section">
-          <div className="card" style={{ padding: 0, overflow: 'hidden', gap: 0 }}>
-            <div className="placeholder-img" style={{ width: '100%', height: 110, borderRadius: 0, border: 'none', borderBottom: '2px dashed var(--honey-deep)', fontSize: 13 }}>
+          <div className="card prize-card">
+            <div className="placeholder-img" style={{ width: 64, height: 64, fontSize: 10 }}>
               Ảnh quà
             </div>
-            <div className="col" style={{ padding: '14px 16px', gap: 4 }}>
-              {allPrizes.map((pz, i) => (
-                <div key={i} className="display" style={{ fontSize: i === 0 ? 22 : 17, lineHeight: 1.15, fontWeight: 800 }}>
-                  {allPrizes.length > 1 && <span style={{ color: 'var(--honey-text)' }}>Quà {i + 1}: </span>}
-                  {pz.name}
-                </div>
-              ))}
-              <div className="small muted" style={{ marginTop: 4 }}>
-                Giá trị quà {fmtVnd(rule.prizeValue)} · Bước giá {fmtVnd(rule.step)} · Giá từ {fmtVnd(rule.min)} đến {fmtVnd(rule.max)} · {maxBids === Infinity ? 'Không giới hạn lượt ra giá' : `Tối đa ${maxBids} lượt`}
-              </div>
-              {allPrizes.length > 1 && <div className="small muted">{allPrizes.length} giá duy nhất thấp nhất lần lượt nhận quà.</div>}
+            <div className="col grow" style={{ gap: 2 }}>
+              {allPrizes.length > 1 ? (
+                <>
+                  <b className="display" style={{ fontSize: 16, lineHeight: 1.2 }}>
+                    {allPrizes.length} phần quà · {allPrizes.length} người thắng
+                  </b>
+                  <span className="xs clamp2" style={{ fontWeight: 600 }}>
+                    {allPrizes.map((pz) => pz.name).join(' · ')}
+                  </span>
+                </>
+              ) : (
+                <b className="display clamp2" style={{ fontSize: 17, lineHeight: 1.2 }}>
+                  {allPrizes[0]?.name}
+                </b>
+              )}
+              <span className="xs muted">
+                Trị giá {fmtVnd(rule.prizeValue)} · {maxBids === Infinity ? 'không giới hạn lượt' : `tối đa ${maxBids} lượt`}
+              </span>
             </div>
           </div>
         </div>
@@ -258,22 +265,22 @@ export function Room({ roomId }: { roomId: string }) {
         <div
           id="bid-card"
           className="card"
-          style={{ padding: 14, gap: 10, ...(frozen || night ? { background: 'rgba(255,246,224,0.06)', borderColor: 'var(--cream)', boxShadow: 'none', color: 'var(--cream)' } : {}) }}
+          style={{ padding: 12, gap: 8, ...(frozen || night ? { background: 'rgba(255,246,224,0.06)', borderColor: 'var(--cream)', boxShadow: 'none', color: 'var(--cream)' } : {}) }}
         >
           <div className="row between">
-            <h2 className="section-title" style={{ fontSize: 17 }}>
+            <h2 className="section-title" style={{ fontSize: 16 }}>
               Ra giá mới
             </h2>
             <span className="xs" style={{ opacity: 0.75 }}>
-              Ví còn <b>{bal}</b> giọt
+              Bước {fmtVnd(rule.step)} · ví còn <b>{bal}</b> giọt
             </span>
           </div>
           <PriceInput rule={rule} text={priceText} onText={(t) => { setErr(''); setPriceText(t); }} onSubmit={submit} typicalSteps={cfg.bots.typicalSteps} dark={frozen || night} onFocus={() => scrollBidToTop(350)} />
-          <button className="btn big" style={{ height: 48, fontSize: 18 }} onClick={submit} disabled={!canBid}>
+          <button className="btn big" style={{ height: 46, fontSize: 18 }} onClick={submit} disabled={!canBid}>
             <IcGavel size={20} color="#1C1712" />
             Ra giá · 1 giọt mật
           </button>
-          <div className="xs" style={{ textAlign: 'center', opacity: 0.8, minHeight: 18 }} aria-live="polite">
+          <div className="xs" style={{ textAlign: 'center', opacity: 0.8, minHeight: 16, marginTop: -2 }} aria-live="polite">
             {err ? (
               <span style={{ color: frozen || night ? '#FF8A73' : 'var(--dup-text)', fontWeight: 700, fontSize: 13 }}>{err}</span>
             ) : flash ? (
@@ -334,12 +341,12 @@ export function Room({ roomId }: { roomId: string }) {
                 key={k}
                 className="card"
                 disabled={frozen || night || left <= 0}
-                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: '10px 12px', boxShadow: 'none', textAlign: 'left', minHeight: 72, background: frozen || night ? 'transparent' : '#fff', color: 'inherit', borderColor: frozen || night ? 'rgba(255,246,224,0.3)' : 'var(--ink)' }}
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, padding: '6px 10px', boxShadow: 'none', textAlign: 'left', minHeight: 50, borderRadius: 14, borderWidth: 1.5, background: frozen || night ? 'transparent' : '#fff', color: 'inherit', borderColor: frozen || night ? 'rgba(255,246,224,0.3)' : 'var(--ink)' }}
                 onClick={() => nav.openTool(k, roomId, price || cfg.bots.typicalSteps * rule.step)}
               >
-                {k === 'scan' ? <IcSearch /> : <IcThermo />}
-                <span className="col">
-                  <b style={{ fontSize: 14 }}>{k === 'scan' ? 'Soi vùng giá' : 'Nhiệt kế'}</b>
+                {k === 'scan' ? <IcSearch size={22} /> : <IcThermo size={22} />}
+                <span className="col" style={{ minWidth: 0 }}>
+                  <b style={{ fontSize: 13.5 }}>{k === 'scan' ? 'Soi vùng giá' : 'Nhiệt kế'}</b>
                   <span className="xs muted">{frozen ? 'Khóa khi đóng băng' : night ? 'Khóa trong màn đêm' : `Còn ${left} lần`}</span>
                 </span>
               </button>
@@ -364,7 +371,7 @@ export function Room({ roomId }: { roomId: string }) {
       {mine.length > 0 && (
         <div className="section">
           <div className="row between" style={{ alignItems: 'baseline' }}>
-            <h2 className="section-title" style={{ fontSize: 20 }}>
+            <h2 className="section-title" style={{ fontSize: 17 }}>
               Giá của bạn
             </h2>
             <span className="small muted">
@@ -384,7 +391,7 @@ export function Room({ roomId }: { roomId: string }) {
 
       {/* ---------- Hoạt động ---------- */}
       <div className="section">
-        <h2 className="section-title" style={{ fontSize: 20 }}>
+        <h2 className="section-title" style={{ fontSize: 17 }}>
           Trong tổ vừa xảy ra
         </h2>
         <div className="col" style={{ gap: 8 }}>

@@ -21,9 +21,9 @@ export function NextEventStrip({ s, now }: { s: Session; now: number }) {
         <IcEye size={16} />
         <IcRain size={16} />
       </span>
-      <span className="grow" style={{ lineHeight: 1.3 }}>
-        <b>{soon ? 'Sự kiện sắp xảy ra!' : 'Sự kiện bất ngờ sắp đến'}</b>
-        <span className="xs next-sub">Màn đêm, Hé lộ hay Mưa điểm? Đến giờ mới biết</span>
+      <span className="grow" style={{ lineHeight: 1.25, minWidth: 0 }}>
+        <b style={{ fontSize: 14 }}>{soon ? 'Sự kiện sắp xảy ra!' : 'Sự kiện bất ngờ sau'}</b>
+        <span className="xs next-sub">Đến giờ mới biết là gì</span>
       </span>
       <span className={`display next-clock ${soon ? 'pulse' : ''}`}>{fmtClock(left)}</span>
     </div>
@@ -150,14 +150,13 @@ export function ThroneCard({
   record,
   night,
   myLeadPrice,
-  hasBids,
 }: {
   s: Session;
   now: number;
   record: ThroneRecord | null | undefined;
   night: boolean;
   myLeadPrice: number | null;
-  hasBids: boolean;
+  hasBids?: boolean;
 }) {
   const reign = s.reign;
   const held = reign ? now - reign.since : 0;
@@ -181,9 +180,9 @@ export function ThroneCard({
           {recordLine}
         </div>
         <div className="row" style={{ gap: 12 }}>
-          <Bee size={58} mood="worried" onDark />
+          <Bee size={44} mood="worried" onDark />
           <div className="col" style={{ gap: 2 }}>
-            <div className="display" style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.15 }}>
+            <div className="display" style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.15 }}>
               Ngai vàng chìm trong màn đêm
             </div>
             <div className="small" style={{ opacity: 0.85 }}>
@@ -209,7 +208,7 @@ export function ThroneCard({
           {recordLine}
         </div>
         <div className="row" style={{ gap: 12, position: 'relative' }}>
-          <Bee size={70} mood="joy" gavel="raised" onDark />
+          <Bee size={50} mood="joy" gavel="raised" onDark />
           <div className="col grow" style={{ gap: 0 }}>
             <span className="display throne-timer" role="timer" aria-label={`Đã giữ ngai ${fmtDur(held)}`}>
               {fmtDur(held)}
@@ -244,42 +243,35 @@ export function ThroneCard({
   }
 
   return (
-    <div className="throne-card">
-      <div className="row between">
+    <div className="throne-card compact">
+      <Bee size={44} mood={reign ? 'determined' : 'happy'} />
+      <div className="col grow" style={{ gap: 1, minWidth: 0 }}>
         <span className="event-tag" style={{ color: 'var(--honey-text)' }}>
-          <IcCrown size={13} color="#D4A017" /> NGAI VÀNG
+          <IcCrown size={12} color="#D4A017" /> NGAI VÀNG
         </span>
-        {recordLine}
+        {reign ? (
+          <>
+            <b className="ellipsis" style={{ fontSize: 15 }}>
+              {reign.name} đang ngồi ngai
+            </b>
+            <span className="xs muted">
+              Đã giữ <b style={{ color: 'var(--ink)' }}>{fmtDur(held)}</b>
+              {record ? ` · kỷ lục tổ ${fmtDur(Math.max(recMs, breaking ? held : 0))}` : ''}
+              {breaking && <b style={{ color: 'var(--dup-text)' }}> · sắp lập kỷ lục!</b>}
+            </span>
+          </>
+        ) : (
+          <>
+            <b style={{ fontSize: 15 }}>Ngai vàng đang trống!</b>
+            <span className="xs muted">Ra một giá duy nhất để ngồi ngai ngay{record ? ` · kỷ lục tổ ${fmtDur(recMs)}` : ''}</span>
+          </>
+        )}
+        {myTotal > 0 && (
+          <span className="xs" style={{ fontWeight: 600, color: 'var(--honey-text)' }}>
+            Phiên này bạn đã ngồi ngai {fmtDur(myTotal)}
+          </span>
+        )}
       </div>
-      <div className="row" style={{ gap: 12 }}>
-        <Bee size={58} mood={reign ? 'determined' : 'happy'} gavel={reign ? 'none' : 'side'} />
-        <div className="col grow" style={{ gap: 2 }}>
-          {reign ? (
-            <>
-              <div className="display" style={{ fontSize: 19, fontWeight: 800, lineHeight: 1.15 }}>
-                {reign.name} đang ngồi ngai
-              </div>
-              <div className="small">
-                Đã giữ <b>{fmtDur(held)}</b>
-                {breaking && <b style={{ color: 'var(--dup-text)' }}> · sắp lập kỷ lục!</b>}
-              </div>
-              <div className="xs muted">{hasBids ? 'Ra một giá thấp hơn mà không trùng để giành ngai.' : 'Ra giá thấp nhất mà không trùng với ai để giành ngai.'}</div>
-            </>
-          ) : (
-            <>
-              <div className="display" style={{ fontSize: 19, fontWeight: 800, lineHeight: 1.15 }}>
-                Ngai vàng đang trống!
-              </div>
-              <div className="xs muted">Chưa có giá duy nhất nào. Ra giá duy nhất để ngồi ngai ngay.</div>
-            </>
-          )}
-        </div>
-      </div>
-      {myTotal > 0 && (
-        <div className="xs" style={{ fontWeight: 600, color: 'var(--honey-text)' }}>
-          Phiên này bạn đã ngồi ngai tổng cộng {fmtDur(myTotal)}
-        </div>
-      )}
     </div>
   );
 }

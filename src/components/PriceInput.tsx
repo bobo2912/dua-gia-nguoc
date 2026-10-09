@@ -92,7 +92,7 @@ export function PriceInput({ rule, text, onText, onSubmit, typicalSteps, dark, o
   );
 
   return (
-    <div className="col" style={{ gap: 8 }}>
+    <div className="col" style={{ gap: 6 }}>
       <div className="row" style={{ gap: 8 }}>
         {stepBtn(-1)}
         <label className="grow" style={{ position: 'relative', minWidth: 0 }}>
@@ -119,7 +119,7 @@ export function PriceInput({ rule, text, onText, onSubmit, typicalSteps, dark, o
             }}
             style={{
               width: '100%',
-              height: 48,
+              height: 46,
               borderRadius: 12,
               background: 'var(--honey-soft)',
               border: '2px solid var(--honey-deep)',
@@ -139,24 +139,21 @@ export function PriceInput({ rule, text, onText, onSubmit, typicalSteps, dark, o
         {stepBtn(1)}
       </div>
 
-      <label className="no-swipe" style={{ display: 'block' }}>
-        <span className="visually-hidden">Kéo để chọn giá</span>
-        <input
-          type="range"
-          min={1}
-          max={rule.levels}
-          step={1}
-          value={k}
-          onChange={(e) => setK(Number(e.target.value))}
-          style={{ width: '100%', accentColor: '#1C1712', height: 22, margin: 0 }}
-        />
-      </label>
-      <div className="row between xs" style={{ marginTop: -4, opacity: 0.75 }}>
-        <span>{fmtVnd(rule.min)}</span>
-        <span>
-          Bước giá <b>{fmtVnd(rule.step)}</b> · {fmtNum(rule.levels)} mức
-        </span>
-        <span>{fmtVnd(rule.max)}</span>
+      <div className="row xs" style={{ gap: 8 }}>
+        <span style={{ opacity: 0.75, flexShrink: 0 }}>{fmtVnd(rule.min)}</span>
+        <label className="no-swipe grow" style={{ display: 'block' }}>
+          <span className="visually-hidden">Kéo để chọn giá, {fmtNum(rule.levels)} mức</span>
+          <input
+            type="range"
+            min={1}
+            max={rule.levels}
+            step={1}
+            value={k}
+            onChange={(e) => setK(Number(e.target.value))}
+            style={{ width: '100%', accentColor: '#1C1712', height: 22, margin: 0, display: 'block' }}
+          />
+        </label>
+        <span style={{ opacity: 0.75, flexShrink: 0 }}>{fmtVnd(rule.max)}</span>
       </div>
 
       <div className="row" style={{ gap: 8 }}>
@@ -164,7 +161,7 @@ export function PriceInput({ rule, text, onText, onSubmit, typicalSteps, dark, o
           <button
             key={d}
             className="btn outline sm"
-            style={{ flex: 1, height: 34, border: '1.5px solid var(--line)', padding: 0, background: '#fff', color: 'var(--ink)', fontSize: 12, borderRadius: 10 }}
+            style={{ flex: 1, height: 32, border: '1.5px solid var(--line)', padding: 0, background: '#fff', color: 'var(--ink)', fontSize: 12, borderRadius: 10 }}
             onClick={() => stepBy(d)}
           >
             {d > 0 ? '+' : '−'}10 bước
@@ -172,7 +169,7 @@ export function PriceInput({ rule, text, onText, onSubmit, typicalSteps, dark, o
         ))}
         <button
           className="btn outline sm"
-          style={{ flex: 1.2, height: 34, border: '1.5px solid var(--line)', padding: 0, background: '#fff', color: 'var(--ink)', fontSize: 12, borderRadius: 10 }}
+          style={{ flex: 1.2, height: 32, border: '1.5px solid var(--line)', padding: 0, background: '#fff', color: 'var(--ink)', fontSize: 12, borderRadius: 10 }}
           onClick={() => setK(randInt(1, Math.min(rule.levels, typicalSteps * 3)))}
         >
           Ngẫu nhiên

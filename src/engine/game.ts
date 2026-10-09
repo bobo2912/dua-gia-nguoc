@@ -719,13 +719,22 @@ export class GameStore {
     // xử lý nốt các giá đã lên lịch trước giờ đóng
     this.runSessionTail(cfg, s);
     if (s.reign) this.endReign(cfg, s, s.endAt - cfg.freezeSec * 1000);
-    // Công cụ demo: hỗ trợ thắng — bỏ giá thợ săn ảo ở mức bằng hoặc thấp hơn giá thấp nhất của bạn
+    // Công cụ demo: hỗ trợ thắng — giá thấp nhất của bạn thành duy nhất và thấp nhất.
+    // Giữ các mức thấp hơn ở trạng thái bị trùng để màn lật bài vẫn có những lá bị loại trước khi tới giá của bạn.
     let demoBoost = false;
     const chance = this.state.profile.demoWinChance ?? 0;
     const mineNow = myBids(s);
     if (mineNow.length && chance > 0 && Math.random() < chance) {
       const m = Math.min(...mineNow.map((b) => b.price));
-      s.bids = s.bids.filter((b) => b.owner === ME || b.price > m);
+      s.bids = s.bids.filter((b) => b.owner === ME || b.price !== m);
+      const ids = s.joinedBots.length ? s.joinedBots : s.bots.map((b) => b.id);
+      for (const [p, c] of countPrices(s.bids)) {
+        if (p >= m || c !== 1) continue;
+        const holder = s.bids.find((b) => b.price === p)!;
+        if (holder.owner === ME) continue;
+        const other = ids.find((id) => id !== holder.owner && !s.bids.some((b) => b.owner === id && b.price === p));
+        if (other) this.addBid(s, other, p, s.endAt - randInt(1, 15) * 1000);
+      }
       demoBoost = true;
     }
     const counts = countPrices(s.bids);

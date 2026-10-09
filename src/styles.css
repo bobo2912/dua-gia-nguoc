@@ -412,3 +412,34 @@ input, select, textarea { font-size: max(16px, 1em); }
 .gavel-hit-once { animation: hit 0.6s cubic-bezier(0.5, 0, 0.8, 0.5) 1; transform-origin: 80% 80%; }
 .slam-once { display: inline-block; transform-origin: left center; animation: slam-in 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
 @keyframes slam-in { 0% { transform: scale(1.8); opacity: 0; } 55% { transform: scale(0.92); opacity: 1; } 100% { transform: scale(1); } }
+.flip-row.facedown.drum { min-height: 64px; border: 2px solid var(--honey); box-shadow: 0 0 24px rgba(245, 179, 1, 0.35); animation: shake 0.25s ease-in-out infinite, drum-glow 0.9s ease-in-out infinite; }
+@keyframes drum-glow { 50% { box-shadow: 0 0 42px rgba(245, 179, 1, 0.7); } }
+.drum-num { font-size: 40px; font-weight: 800; line-height: 1; color: var(--honey); animation: drum-pop 0.9s ease both; }
+@keyframes drum-pop { 0% { transform: scale(2.2); opacity: 0; } 30% { transform: scale(1); opacity: 1; } 100% { transform: scale(0.85); opacity: 0.6; } }
+.flip-row.win { animation: win-flip 0.7s cubic-bezier(0.3, 1.4, 0.5, 1) both, win-flash 1.2s ease 0.7s 2; }
+@keyframes win-flip { 0% { transform: rotateY(90deg) scale(0.8); opacity: 0; } 60% { transform: rotateY(-10deg) scale(1.06); opacity: 1; } 100% { transform: none; } }
+
+/* ------- Bố cục gọn cho phòng săn: một màn hình thấy ô ra giá, sự kiện, công cụ và ngai vàng ------- */
+.room .section { padding-top: 12px; gap: 10px; }
+.room .hdr { gap: 10px; padding-bottom: 14px; }
+.prize-card { flex-direction: row; align-items: center; gap: 12px; padding: 10px 12px; box-shadow: none; border-width: 1.5px; border-radius: 16px; }
+.next-event { padding: 8px 12px; gap: 10px; border-radius: 14px; }
+.next-clock { font-size: 22px; }
+.event-card { padding: 10px 12px; gap: 8px; border-radius: 16px; }
+.event-card .event-ic { width: 38px; height: 38px; border-radius: 19px; }
+.event-card .event-ic svg { width: 21px; height: 21px; }
+.event-card b { font-size: 14px !important; }
+.event-clock { font-size: 22px; }
+.rv-cell { height: 38px; font-size: 13px; }
+.throne-card { padding: 10px 12px; gap: 8px; border-radius: 16px; }
+.throne-card.compact { flex-direction: row; align-items: center; gap: 10px; border-width: 1.5px; }
+.throne-timer { font-size: 40px; }
+.room .bidrow { padding: 9px 12px; }
+.room .bidprice { font-size: 19px; }
+.flip-row { min-height: 42px; padding: 6px 12px; border-radius: 12px; }
+.flip-price { font-size: 19px; }
+.flip-badge { font-size: 12px; padding: 4px 9px; }
+.flip-row.win { min-height: 58px; }
+.flip-row.win .flip-price { font-size: 27px; }
+.flip-row.skip { min-height: 36px; font-size: 12.5px; }
+.flip-list { gap: 5px; }
