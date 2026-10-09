@@ -56,7 +56,19 @@ export function Room({ roomId }: { roomId: string }) {
       if (d.roomId === roomId) {
         setErr('');
         setPriceText(String(d.price));
-        window.setTimeout(() => document.getElementById('bid-input')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50);
+        // Chỉ cuộn khi ô Ra giá đang bị khuất; đang thấy rồi thì giữ nguyên màn hình (tránh nhảy lên xuống)
+        window.setTimeout(() => {
+          const card = document.getElementById('bid-card');
+          const sc = card?.closest('.scroll') as HTMLElement | null;
+          if (!card || !sc) return;
+          const c = card.getBoundingClientRect();
+          const v = sc.getBoundingClientRect();
+          const hidden = c.top < v.top || c.bottom > v.bottom;
+          if (hidden) {
+            const gap = sc.classList.contains('frozen') ? 84 : 12;
+            sc.scrollTo({ top: Math.max(0, c.top - v.top + sc.scrollTop - gap), behavior: 'smooth' });
+          }
+        }, 50);
       }
     };
     window.addEventListener(PICK_EVENT, on);
@@ -347,7 +359,7 @@ export function Room({ roomId }: { roomId: string }) {
       {/* ---------- Sự kiện bất ngờ ---------- */}
       {ev ? (
         <div className="section">
-          <EventBanner s={s} now={now} myBidPrices={new Set(mine.map((b) => b.price))} />
+          <EventBanner s={s} now={now} myBidPrices={new Set(mine.map((b) => b.price))} selected={price} />
         </div>
       ) : (
         running &&

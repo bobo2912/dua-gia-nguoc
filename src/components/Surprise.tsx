@@ -31,7 +31,7 @@ export function NextEventStrip({ s, now }: { s: Session; now: number }) {
 }
 
 // ------------------------- Băng sự kiện -------------------------
-export function EventBanner({ s, now, myBidPrices }: { s: Session; now: number; myBidPrices: Set<number> }) {
+export function EventBanner({ s, now, myBidPrices, selected }: { s: Session; now: number; myBidPrices: Set<number>; selected?: number }) {
   const e = activeEvent(s, now);
   if (!e) return null;
   const left = e.until - now;
@@ -117,7 +117,7 @@ export function EventBanner({ s, now, myBidPrices }: { s: Session; now: number; 
               </>
             )}
           </b>
-          <span className="xs muted">Thông tin lúc công bố, ai trong tổ cũng thấy. Bấm ô dấu hỏi để chọn giá đó.</span>
+          <span className="xs muted">Ô dấu hỏi: chưa ai chọn hoặc mới có 1 người. Bấm để điền giá vào ô Ra giá.</span>
         </div>
         <span className="display event-clock" style={{ color: 'var(--dup-text)' }} role="timer">
           {fmtClock(left)}
@@ -131,7 +131,13 @@ export function EventBanner({ s, now, myBidPrices }: { s: Session; now: number; 
               <small>{shortVnd(p)}</small>
             </span>
           ) : (
-            <button key={p} className={`rv-cell ${myBidPrices.has(p) ? 'mine' : ''}`} onClick={() => pickPrice(p)} aria-label={`Chọn giá ${fmtVnd(p)}`}>
+            <button
+              key={p}
+              className={`rv-cell ${myBidPrices.has(p) ? 'mine' : ''} ${selected === p ? 'picked' : ''}`}
+              onClick={() => pickPrice(p)}
+              aria-pressed={selected === p}
+              aria-label={`Chọn giá ${fmtVnd(p)}`}
+            >
               ?<small>{shortVnd(p)}</small>
             </button>
           ),
