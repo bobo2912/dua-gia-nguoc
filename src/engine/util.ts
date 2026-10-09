@@ -4,6 +4,20 @@ export const fmtVnd = (v: number) => v.toLocaleString('vi-VN').replace(/,/g, '.'
 
 export const fmtNum = (v: number) => v.toLocaleString('vi-VN').replace(/,/g, '.');
 
+/** Thời lượng bằng chữ: 45 → "45 giây", 90 → "1 phút 30 giây" */
+export function fmtSec(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const r = Math.round(sec % 60);
+  if (!m) return `${r} giây`;
+  return r ? `${m} phút ${r} giây` : `${m} phút`;
+}
+
+/** Đồng hồ đếm lên (làm tròn xuống): 134000 → "2:14" */
+export function fmtDur(ms: number): string {
+  const t = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+}
+
 export function fmtClock(ms: number): string {
   const total = Math.max(0, Math.ceil(ms / 1000));
   const h = Math.floor(total / 3600);

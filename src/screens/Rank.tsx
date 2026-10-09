@@ -1,4 +1,4 @@
-import { HUNT_POINTS, RANKS } from '../config';
+import { HUNT_POINTS, RANKS, SURPRISE, THRONE } from '../config';
 import { nextRank, rankOf } from '../engine/game';
 import { endOfMonth } from '../engine/util';
 import { useGame, useNav } from '../nav';
@@ -133,7 +133,9 @@ export function Rank() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
             {[
               [`+${HUNT_POINTS.joinSession}`, 'Tham gia một phiên'],
-              [`+${HUNT_POINTS.holdLeadEvery}`, `Mỗi ${HUNT_POINTS.holdLeadIntervalSec} giây giữ ngôi đầu (bản demo)`],
+              [`+${THRONE.milestones.reduce((t, m) => t + m.pts, 0)}`, `Ngai vàng: giữ ngôi đầu qua ${THRONE.milestones.length} mốc (bản demo)`],
+              [`+${THRONE.recordBonus}`, 'Phá kỷ lục giữ ngai của tổ'],
+              [`+${SURPRISE.rain.pointsPerBid}`, 'Mỗi giá ra trong Mưa điểm'],
               [`+${HUNT_POINTS.win}`, 'Thắng một phiên'],
               [`+${HUNT_POINTS.streak7}`, 'Hoàn thành chuỗi 7 ngày'],
             ].map(([n, t]) => (

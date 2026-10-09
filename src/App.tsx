@@ -35,7 +35,7 @@ export default function App() {
   // Hướng dẫn luật chơi: tự bật lần đầu mở app
   const [guide, setGuide] = useState(() => !guideSeen());
   const [tool, setTool] = useState<{ kind: 'scan' | 'thermo'; roomId: string; center: number } | null>(null);
-  const [gavel, setGavel] = useState<{ sessionId: string; won: boolean } | null>(null);
+  const [gavel, setGavel] = useState<{ sessionId: string; won: boolean; replay?: boolean } | null>(null);
   const [brk, setBrk] = useState(false);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const screenRef = useRef(screen);
@@ -205,6 +205,29 @@ export default function App() {
         case 'break':
           setBrk(true);
           break;
+        case 'surprise':
+          if (inRoom(e.roomId)) {
+            try {
+              navigator.vibrate?.(e.kind === 'night' ? [60, 80, 60, 80, 200] : [40, 60, 40]);
+            } catch {
+              /* không hỗ trợ rung */
+            }
+          } else
+            pushToast({
+              tone: 'warn',
+              title: `Sự kiện ở Tổ ${e.roomName}!`,
+              text: e.text,
+              action: { label: 'Vào tổ', run: () => go({ name: 'room', roomId: e.roomId }) },
+            });
+          break;
+        case 'throne':
+          pushToast({
+            tone: 'good',
+            title: 'Kỷ lục mới!',
+            text: e.text,
+            action: inRoom(e.roomId) ? undefined : { label: 'Vào tổ', run: () => go({ name: 'room', roomId: e.roomId }) },
+          });
+          break;
       }
     });
     store.start();
@@ -258,6 +281,7 @@ export default function App() {
     openGuide: () => setGuide(true),
     openTool: (kind, roomId, center) => setTool({ kind, roomId, center }),
     toast: (text, tone = 'info') => pushToast({ text, tone }),
+    openReveal: (sessionId) => setGavel({ sessionId, won: false, replay: true }),
   };
 
   const renderScreen = (sc: Screen) => {
@@ -322,11 +346,15 @@ export default function App() {
         {tool && <ToolSheet kind={tool.kind} roomId={tool.roomId} center={tool.center} onClose={() => setTool(null)} />}
         {gavel && (
           <GavelOverlay
+            key={gavel.sessionId + (gavel.replay ? '-r' : '')}
+            sessionId={gavel.sessionId}
             won={gavel.won}
-            onDone={() => {
+            replay={gavel.replay}
+            onDone={(target) => {
               const g = gavel;
               setGavel(null);
-              go(g.won ? { name: 'win', sessionId: g.sessionId } : { name: 'result', sessionId: g.sessionId });
+              if (g.replay && target !== 'win') return;
+              go(target === 'win' ? { name: 'win', sessionId: g.sessionId } : { name: 'result', sessionId: g.sessionId });
             }}
           />
         )}

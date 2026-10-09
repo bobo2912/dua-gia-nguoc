@@ -59,6 +59,8 @@ export interface RoomConfig {
   bots: BotProfile;
   /** Phòng Bí Mật: xuất hiện theo lịch ẩn */
   secret?: { everySec: number; announceSec: number };
+  /** Tắt sự kiện bất ngờ cho phòng này (mặc định bật theo SURPRISE.enabled) */
+  surprises?: boolean;
   /** Số lần dùng công cụ mỗi phiên */
   tools: { scan: number; thermo: number };
 }
@@ -284,11 +286,45 @@ export const RANKS: RankDef[] = [
 
 export const HUNT_POINTS = {
   joinSession: 10,
-  holdLeadEvery: 5,
-  /** Mỗi bao nhiêu giây giữ ngôi thì được holdLeadEvery điểm. GDD: 5 phút */
-  holdLeadIntervalSec: 30,
   win: 100,
   streak7: 20,
+};
+
+// ------------------------- Ngai vàng (giữ ngôi đầu) -------------------------
+/**
+ * Giữ ngôi đầu liên tục đến mốc nào thì được thưởng điểm săn của mốc đó.
+ * Mốc càng xa thưởng càng lớn. Bản demo rút ngắn thời gian; sản phẩm thật nên nhân theo thời lượng phiên.
+ */
+export const THRONE = {
+  milestones: [
+    { sec: 20, pts: 5, label: 'Ngồi ấm ngai' },
+    { sec: 45, pts: 10, label: 'Ngồi vững' },
+    { sec: 90, pts: 20, label: 'Trấn giữ' },
+    { sec: 150, pts: 35, label: 'Bá chủ tổ săn' },
+  ],
+  /** Thưởng thêm khi phá kỷ lục giữ ngai của tổ (1 lần mỗi phiên) */
+  recordBonus: 25,
+};
+
+// ------------------------- Sự kiện bất ngờ trong phiên -------------------------
+/**
+ * Sự kiện áp dụng cho tất cả người trong tổ cùng lúc, không ai được lợi riêng.
+ * LƯU Ý PHÁP LÝ: cơ chế này cần được mô tả trong thể lệ đăng ký với Cục Xúc tiến thương mại.
+ */
+export type SurpriseKind = 'night' | 'reveal' | 'rain';
+export const SURPRISE = {
+  enabled: true,
+  /** Phòng dài từ ngưỡng này (giây) có 2 sự kiện mỗi phiên, ngắn hơn thì 1 */
+  twoEventsFromSec: 240,
+  /** Không xảy ra trong khoảng đầu phiên (tỷ lệ thời lượng) */
+  notBeforeRatio: 0.2,
+  /** Phải kết thúc trước giai đoạn đóng băng ít nhất (giây) */
+  endBeforeFreezeSec: 6,
+  /** Khoảng nghỉ tối thiểu giữa hai sự kiện (giây) */
+  gapSec: 10,
+  night: { durationSec: 20, name: 'Màn đêm', desc: 'Mọi trạng thái bị ẩn. Ai cũng phải ra giá mù!' },
+  reveal: { durationSec: 25, levels: 11, name: 'Hé lộ', desc: 'Hệ thống công bố một vùng giá đang có nhiều giá trùng.' },
+  rain: { durationSec: 30, pointsPerBid: 5, name: 'Mưa điểm', desc: 'Mỗi giá ra trong lúc mưa được thêm điểm săn.' },
 };
 
 export const STREAK = { days: 7, rewardDrops: 5 };

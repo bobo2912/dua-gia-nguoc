@@ -1,7 +1,7 @@
-import type { Prize, RankId } from '../config';
+import type { Prize, RankId, SurpriseKind } from '../config';
 
 /** Trạng thái một mức giá của người chơi */
-export type BidStatus = 'leading' | 'unique' | 'dup' | 'pending';
+export type BidStatus = 'leading' | 'unique' | 'dup' | 'pending' | 'hidden';
 
 export const ME = 'me';
 
@@ -24,7 +24,35 @@ export interface FeedItem {
   id: string;
   at: number;
   text: string;
-  tone: 'lead' | 'dup' | 'info' | 'me' | 'freeze';
+  tone: 'lead' | 'dup' | 'info' | 'me' | 'freeze' | 'event' | 'throne';
+}
+
+/** Sự kiện bất ngờ trong phiên */
+export interface SurpriseEvent {
+  id: string;
+  kind: SurpriseKind;
+  at: number;
+  until: number;
+  started: boolean;
+  ended?: boolean;
+  /** Hé lộ: vùng giá được công bố (đồng) và các mức đang bị trùng lúc công bố */
+  reveal?: { from: number; to: number; step: number; dupPrices: number[]; dupBids: number };
+  /** Mưa điểm: điểm săn bạn nhận được trong lúc mưa */
+  rainPoints?: number;
+}
+
+/** Một lượt giữ ngai (ngôi đầu) */
+export interface Reign {
+  owner: string;
+  name: string;
+  since: number;
+}
+
+export interface ThroneRecord {
+  name: string;
+  ms: number;
+  me: boolean;
+  at: number;
 }
 
 export interface Winner {
@@ -55,6 +83,8 @@ export interface SessionResult {
   /** Kết quả có sự can thiệp của công cụ demo */
   demoBoost?: boolean;
   pointsEarned: number;
+  /** Ngai vàng trong phiên */
+  throne?: { myTotalMs: number; myBestMs: number; record: ThroneRecord | null; newRecord: boolean };
 }
 
 export interface Session {
@@ -87,6 +117,16 @@ export interface Session {
   pointsEarned: number;
   openedNotified: boolean;
   announced: boolean;
+  /** Sự kiện bất ngờ đã lên lịch */
+  events: SurpriseEvent[];
+  /** Ai đang ngồi ngai (ngôi đầu) và từ lúc nào */
+  reign: Reign | null;
+  /** Số mốc Ngai vàng đã thưởng trong lượt giữ ngai hiện tại của bạn */
+  reignAwarded: number;
+  myThroneMs: number;
+  myBestReignMs: number;
+  /** Đã phá kỷ lục tổ trong phiên này */
+  brokeRecord: boolean;
 }
 
 export interface RoomRuntime {
@@ -97,6 +137,8 @@ export interface RoomRuntime {
   pendingRollovers: number;
   nextSecretAt?: number;
   lastResult?: { sessionId: string; no: number; endAt: number; result: SessionResult };
+  /** Kỷ lục giữ ngai lâu nhất của tổ */
+  throneRecord?: ThroneRecord | null;
 }
 
 export type DropSource = 'giao dịch' | 'loyalty' | 'thưởng';
@@ -184,4 +226,6 @@ export type GameEvent =
   | { type: 'outbid'; roomId: string; priceVnd: number; rivalTimes: number; bestLeftVnd: number | null }
   | { type: 'result'; roomId: string; sessionId: string; won: boolean; roomName: string }
   | { type: 'toast'; text: string; roomId?: string; tone?: 'good' | 'warn' | 'info' }
-  | { type: 'break' };
+  | { type: 'break' }
+  | { type: 'surprise'; roomId: string; roomName: string; kind: SurpriseKind; text: string }
+  | { type: 'throne'; roomId: string; text: string };

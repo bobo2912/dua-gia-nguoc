@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ROOMS, RANKS, priceRule, type RoomConfig, type Prize } from '../config';
 import type { Session } from '../engine/types';
-import { isFrozen, isRunning, myBids, participantsOf, rankIndex, rankOf, visibleStatuses } from '../engine/game';
+import { isFrozen, isNight, isRunning, myBids, participantsOf, rankIndex, rankOf, visibleStatuses } from '../engine/game';
 import type { GameStore } from '../engine/game';
 import { fmtAgo, fmtClock, fmtVnd } from '../engine/util';
 import { useGame, useNav } from '../nav';
@@ -182,12 +182,13 @@ export function Lobby() {
   );
 }
 
-type Tone = 'lead' | 'unique' | 'dup' | 'frozen';
+type Tone = 'lead' | 'unique' | 'dup' | 'frozen' | 'night';
 const TONE_COLORS: Record<Tone, { bg: string; fg: string; dot: string }> = {
   lead: { bg: 'var(--lead)', fg: '#fff', dot: 'var(--lead)' },
   unique: { bg: 'var(--honey-soft)', fg: 'var(--honey-text-strong)', dot: 'var(--honey-deep)' },
   dup: { bg: 'var(--dup-soft)', fg: 'var(--dup-text)', dot: 'var(--dup)' },
   frozen: { bg: '#E3F1FB', fg: '#1D5B80', dot: '#3C8DC0' },
+  night: { bg: '#1D2550', fg: '#FFE7A3', dot: '#7B6CF0' },
 };
 
 /** Trạng thái giá của người chơi trong một tổ (null nếu chưa ra giá) */
@@ -200,6 +201,7 @@ function statusOf(g: GameStore, roomId: string, now: number): { tone: Tone; text
   const n = st.length;
   if (isFrozen(s, now))
     return { tone: 'frozen', n, short: 'Đóng băng', text: `Đang đóng băng · ${lead ? `bạn dẫn đầu với ${fmtVnd(lead.bid.price)} lúc đóng băng` : 'chờ gõ búa'}` };
+  if (isNight(s, now)) return { tone: 'night', n, short: 'Màn đêm', text: 'Màn đêm: trạng thái đang bị ẩn, chờ trời sáng' };
   if (lead) return { tone: 'lead', n, short: 'Dẫn đầu', text: `Bạn đang dẫn đầu · ${fmtVnd(lead.bid.price)} thấp nhất và duy nhất` };
   if (uniq.length) return { tone: 'unique', n, short: 'Duy nhất', text: `Có ${uniq.length} giá duy nhất nhưng chưa thấp nhất` };
   return { tone: 'dup', n, short: 'Bị trùng', text: n === 1 ? 'Giá của bạn đang bị trùng' : `Cả ${n} giá của bạn đều bị trùng` };

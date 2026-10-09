@@ -67,6 +67,15 @@ export const IcThermo = ({ size = 28, color = 'currentColor' }: P) => (
 export const IcSnow = ({ size = 24, color = 'currentColor' }: P) => (
   <svg {...base(size)} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round"><path d="M12 2v20M4 6l16 12M20 6L4 18M9 3l3 3 3-3M9 21l3-3 3 3" /></svg>
 );
+export const IcMoon = ({ size = 24, color = 'currentColor' }: P) => (
+  <svg {...base(size)} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" /></svg>
+);
+export const IcEye = ({ size = 24, color = 'currentColor' }: P) => (
+  <svg {...base(size)} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
+);
+export const IcRain = ({ size = 24, color = 'currentColor' }: P) => (
+  <svg {...base(size)} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 15a4.5 4.5 0 0 1-.5-9A6 6 0 0 1 18 7.5 3.75 3.75 0 0 1 17.5 15z" /><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3" /></svg>
+);
 export const IcSwords = ({ size = 30, color = 'currentColor' }: P) => (
   <svg {...base(size)} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4l10 10M4 4h4M4 4v4M20 4L10 14M20 4h-4M20 4v4M7 17l-3 3M17 17l3 3M12 14l-3 3M12 14l3 3" /></svg>
 );

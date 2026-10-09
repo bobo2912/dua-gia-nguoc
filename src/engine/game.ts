@@ -21,13 +21,17 @@ import {
   type RoomConfig,
   priceRule,
   SCAN_HALF,
+  SURPRISE,
   THERMO_SPLIT,
+  THRONE,
+  type SurpriseKind,
 } from '../config';
 import {
   addDays,
   dayKey,
   endOfDay,
   endOfWeek,
+  fmtSec,
   fmtVnd,
   inWindow,
   maskedName,
@@ -52,10 +56,12 @@ import {
   type RoomRuntime,
   type Session,
   type SessionResult,
+  type SurpriseEvent,
+  type ThroneRecord,
 } from './types';
 
 const STORAGE_KEY = 'mua-do-luxury-v1';
-const STATE_VERSION = 3;
+const STATE_VERSION = 4;
 
 export const roomCfg = (id: string): RoomConfig => ROOMS.find((r) => r.id === id)!;
 
@@ -106,12 +112,76 @@ export const isRunning = (s: Session, now: number) => now >= s.startAt && now < 
 export const participantsOf = (s: Session) => s.joinedBots.length + (s.myJoined ? 1 : 0);
 export const myBids = (s: Session) => s.bids.filter((b) => b.owner === ME);
 
+// ------------------------- Sự kiện bất ngờ -------------------------
+/** Sự kiện đang diễn ra (theo thời gian), null nếu không có */
+export function activeEvent(s: Session, now: number): SurpriseEvent | null {
+  for (const e of s.events ?? []) {
+    if (now >= e.at && now < e.until && (e.kind !== 'reveal' || e.reveal)) return e;
+  }
+  return null;
+}
+const eventOn = (s: Session, now: number, kind: SurpriseKind) => (s.events ?? []).some((e) => e.kind === kind && now >= e.at && now < e.until);
+export const isNight = (s: Session, now: number) => eventOn(s, now, 'night');
+export const isRain = (s: Session, now: number) => eventOn(s, now, 'rain');
+
+/** Lên lịch sự kiện bất ngờ cho một phiên: rải đều trong khoảng giữa phiên, không chồng lên nhau */
+function planEvents(cfg: RoomConfig, startAt: number, endAt: number): SurpriseEvent[] {
+  if (!SURPRISE.enabled || cfg.surprises === false) return [];
+  const n = cfg.durationSec >= SURPRISE.twoEventsFromSec ? 2 : 1;
+  const from = startAt + cfg.durationSec * 1000 * SURPRISE.notBeforeRatio;
+  const to = endAt - (cfg.freezeSec + SURPRISE.endBeforeFreezeSec) * 1000;
+  const kinds = (['night', 'reveal', 'rain'] as SurpriseKind[]).sort(() => Math.random() - 0.5).slice(0, n);
+  const slot = (to - from) / n;
+  const out: SurpriseEvent[] = [];
+  kinds.forEach((kind, i) => {
+    const d = SURPRISE[kind].durationSec * 1000;
+    const lo = from + i * slot;
+    const hi = lo + slot - d - (i < n - 1 ? SURPRISE.gapSec * 1000 : 0);
+    if (hi < lo) return;
+    const at = rand(lo, hi);
+    out.push({ id: uid('ev'), kind, at, until: at + d, started: false });
+  });
+  return out;
+}
+
+/** Mưa điểm: thợ săn ảo tranh thủ ra giá dồn dập hơn */
+function addRainBids(s: Session, e: SurpriseEvent) {
+  const extra = Math.round(s.bots.length * 0.35);
+  const joinAt = new Map(s.botJoins.map((j) => [j.botId, j.at]));
+  const eligible = s.bots.filter((b) => (joinAt.get(b.id) ?? Infinity) < e.until - 2000);
+  for (let i = 0; i < extra && eligible.length; i++) {
+    const b = pick(eligible);
+    s.schedule.push({ owner: b.id, at: Math.max(joinAt.get(b.id)!, rand(e.at, e.until)) });
+  }
+  // giữ lịch theo thứ tự thời gian cho phần chưa chạy
+  const done = s.schedule.slice(0, s.schedIdx);
+  const rest = s.schedule.slice(s.schedIdx).sort((a, b) => a.at - b.at);
+  s.schedule = [...done, ...rest];
+}
+
+/** Kỷ lục giữ ngai khởi tạo cho bản demo */
+function seedThroneRecord(cfg: RoomConfig, now: number): ThroneRecord {
+  const playable = (cfg.durationSec - cfg.freezeSec) * 1000;
+  return { name: maskedName(), ms: Math.round((playable * rand(0.22, 0.42)) / 1000) * 1000, me: false, at: now - randInt(1, 6) * 86400000 };
+}
+
+/** Bổ sung trường mới cho phiên lưu từ bản cũ */
+function upgradeSession(s: Session) {
+  s.events ??= [];
+  s.reign ??= null;
+  s.reignAwarded ??= 0;
+  s.myThroneMs ??= 0;
+  s.myBestReignMs ??= 0;
+  s.brokeRecord ??= false;
+}
+
 /** Trạng thái người chơi được phép thấy (tôn trọng đóng băng) */
 export function visibleStatuses(s: Session, now: number): { bid: Bid; status: BidStatus; frozen: boolean }[] {
   const mine = myBids(s).sort((a, b) => b.at - a.at);
   if (s.frozenSnap && now < s.endAt) {
     return mine.map((b) => ({ bid: b, status: s.frozenSnap![b.id] ?? 'pending', frozen: true }));
   }
+  if (isNight(s, now)) return mine.map((b) => ({ bid: b, status: 'hidden' as const, frozen: false }));
   const counts = countPrices(s.bids);
   const lu = lowestUnique(counts);
   return mine.map((b) => ({ bid: b, status: liveStatus(b, counts, lu), frozen: false }));
@@ -152,7 +222,8 @@ function newSession(cfg: RoomConfig, no: number, startAt: number, jackpot: Prize
   }
   botJoins.sort((a, b) => a.at - b.at);
   schedule.sort((a, b) => a.at - b.at);
-  return {
+  const events = planEvents(cfg, startAt, endAt);
+  const session: Session = {
     id: uid('s'),
     roomId: cfg.id,
     no,
@@ -182,7 +253,15 @@ function newSession(cfg: RoomConfig, no: number, startAt: number, jackpot: Prize
     pointsEarned: 0,
     openedNotified: false,
     announced: false,
+    events,
+    reign: null,
+    reignAwarded: 0,
+    myThroneMs: 0,
+    myBestReignMs: 0,
+    brokeRecord: false,
   };
+  for (const e of events) if (e.kind === 'rain') addRainBids(session, e);
+  return session;
 }
 
 // ------------------------- Trạng thái ban đầu -------------------------
@@ -190,7 +269,7 @@ function seedState(now: number): GameState {
   const rooms: Record<string, RoomRuntime> = {};
   const offsets: Record<string, number> = { flash: -40, golden: 25, special: -150, vip: -30, partner: -60 };
   for (const cfg of ROOMS) {
-    const rt: RoomRuntime = { roomId: cfg.id, session: null, seq: 100 + randInt(1, 60), pendingJackpot: [], pendingRollovers: 0 };
+    const rt: RoomRuntime = { roomId: cfg.id, session: null, seq: 100 + randInt(1, 60), pendingJackpot: [], pendingRollovers: 0, throneRecord: seedThroneRecord(cfg, now) };
     if (cfg.secret) {
       rt.nextSecretAt = now + 150 * 1000;
     } else {
@@ -300,6 +379,16 @@ export class GameStore {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return null;
       const s = JSON.parse(raw) as GameState;
+      if (s.v === 3) {
+        // nâng cấp dữ liệu bản cũ: giữ nguyên ví, hạng, lịch sử
+        for (const cfg of ROOMS) {
+          const rt = s.rooms[cfg.id];
+          if (!rt) continue;
+          rt.throneRecord ??= seedThroneRecord(cfg, Date.now());
+          if (rt.session) upgradeSession(rt.session);
+        }
+        s.v = STATE_VERSION;
+      }
       if (s.v !== STATE_VERSION) return null;
       return s;
     } catch {
@@ -451,6 +540,20 @@ export class GameStore {
         }
       }
     }
+    // 3b. sự kiện bất ngờ: bắt đầu và kết thúc
+    for (const e of s.events) {
+      if (!e.started && now >= e.at) {
+        e.started = true;
+        if (now < e.until) this.startEvent(cfg, s, e, now);
+        else e.ended = true;
+      }
+      if (e.started && !e.ended && now >= e.until) {
+        e.ended = true;
+        if (e.kind === 'night') this.pushFeed(s, 'Trời sáng! Trạng thái hiện trở lại', 'event', e.until);
+        if (e.kind === 'rain') this.pushFeed(s, e.rainPoints ? `Mưa điểm đã tạnh · bạn hứng được +${e.rainPoints} điểm săn` : 'Mưa điểm đã tạnh', 'event', e.until);
+      }
+    }
+
     // 4. đóng băng: chụp trạng thái
     if (frozenNow && !s.frozenSnap) {
       const counts = countPrices(s.bids);
@@ -459,6 +562,7 @@ export class GameStore {
       for (const b of myBids(s)) s.frozenSnap[b.id] = liveStatus(b, counts, lu);
       this.pushFeed(s, 'Búa sắp gõ! Trạng thái đã đóng băng', 'freeze', now);
       s.leadSince = null;
+      if (s.reign) this.endReign(cfg, s, now);
     }
     if (frozenNow) return;
 
@@ -467,8 +571,13 @@ export class GameStore {
     const lu = lowestUnique(counts);
     const leaderBid = lu === null ? null : s.bids.find((b) => b.price === lu) ?? null;
     const leaderOwner = leaderBid?.owner ?? null;
+    // Ngai vàng: máy chủ luôn theo dõi ai đang ngồi ngai, kể cả trong Màn đêm
+    this.trackReign(cfg, s, leaderOwner, now);
+    const night = isNight(s, now);
 
-    if (s.myLeadBidId) {
+    if (night) {
+      // Màn đêm: không báo bị cướp ngôi, không báo ai lên ngôi. Mọi thứ lộ ra khi trời sáng.
+    } else if (s.myLeadBidId) {
       const prev = s.bids.find((b) => b.id === s.myLeadBidId);
       if (prev && (counts.get(prev.price) ?? 0) > 1) {
         const others = s.bids.filter((b) => b.price === prev.price && b.owner !== ME).sort((a, b) => b.at - a.at);
@@ -489,18 +598,20 @@ export class GameStore {
         });
       }
     }
-    const myLeadNow = leaderBid && leaderBid.owner === ME ? leaderBid.id : null;
-    if (myLeadNow && s.myLeadBidId !== myLeadNow) {
-      s.leadSince = now;
-      s.leadAwarded = 0;
-    }
-    if (!myLeadNow) s.leadSince = null;
-    s.myLeadBidId = myLeadNow;
+    if (!night) {
+      const myLeadNow = leaderBid && leaderBid.owner === ME ? leaderBid.id : null;
+      if (myLeadNow && s.myLeadBidId !== myLeadNow) {
+        s.leadSince = now;
+        s.leadAwarded = 0;
+      }
+      if (!myLeadNow) s.leadSince = null;
+      s.myLeadBidId = myLeadNow;
 
-    if (leaderOwner !== s.lastLeaderOwner && leaderOwner) {
-      this.pushFeed(s, leaderOwner === ME ? 'Bạn vừa giành ngôi đầu!' : 'Một thợ săn vừa giành ngôi đầu', leaderOwner === ME ? 'me' : 'lead', now);
+      if (leaderOwner !== s.lastLeaderOwner && leaderOwner) {
+        this.pushFeed(s, leaderOwner === ME ? 'Bạn vừa giành ngôi đầu!' : 'Một thợ săn vừa giành ngôi đầu', leaderOwner === ME ? 'me' : 'lead', now);
+      }
+      s.lastLeaderOwner = leaderOwner;
     }
-    s.lastLeaderOwner = leaderOwner;
 
     // 6. gộp thông báo "N giá vừa bị trùng" mỗi 10 giây
     s.dupWindow.count += newDups;
@@ -509,15 +620,86 @@ export class GameStore {
       s.dupWindow = { start: now, count: 0 };
     }
 
-    // 7. điểm săn khi giữ ngôi
-    if (s.leadSince) {
-      const due = Math.floor((now - s.leadSince) / (HUNT_POINTS.holdLeadIntervalSec * 1000));
-      if (due > s.leadAwarded) {
-        const pts = (due - s.leadAwarded) * HUNT_POINTS.holdLeadEvery;
-        s.leadAwarded = due;
-        this.addHuntPoints(pts, s);
+    // 7. Ngai vàng: thưởng theo mốc giữ ngai và khi phá kỷ lục tổ (chờ trời sáng mới báo)
+    if (!night && s.reign?.owner === ME) {
+      const held = now - s.reign.since;
+      while (s.reignAwarded < THRONE.milestones.length && held >= THRONE.milestones[s.reignAwarded].sec * 1000) {
+        const m = THRONE.milestones[s.reignAwarded++];
+        this.addHuntPoints(m.pts, s);
+        this.pushFeed(s, `${m.label}: giữ ngai ${fmtSec(m.sec)} · +${m.pts} điểm săn`, 'throne', now);
+      }
+      const rec = this.state.rooms[cfg.id].throneRecord;
+      if (!s.brokeRecord && rec && held > rec.ms) {
+        s.brokeRecord = true;
+        this.addHuntPoints(THRONE.recordBonus, s);
+        this.pushFeed(s, `Bạn vừa phá kỷ lục giữ ngai của tổ! +${THRONE.recordBonus} điểm săn`, 'throne', now);
+        this.emit({ type: 'throne', roomId: cfg.id, text: `Bạn vừa phá kỷ lục giữ ngai Tổ ${cfg.name}!` });
       }
     }
+  }
+
+  // ---------- Ngai vàng ----------
+  private trackReign(cfg: RoomConfig, s: Session, leaderOwner: string | null, now: number) {
+    if (s.reign && s.reign.owner === leaderOwner) return;
+    if (s.reign) this.endReign(cfg, s, now);
+    if (!leaderOwner) return;
+    const name = leaderOwner === ME ? this.state.profile.name : s.bots.find((b) => b.id === leaderOwner)?.name ?? 'Thợ săn';
+    s.reign = { owner: leaderOwner, name, since: now };
+    if (leaderOwner === ME) s.reignAwarded = 0;
+  }
+  private endReign(cfg: RoomConfig, s: Session, now: number) {
+    const r = s.reign;
+    if (!r) return;
+    s.reign = null;
+    const ms = Math.max(0, now - r.since);
+    if (r.owner === ME) {
+      s.myThroneMs += ms;
+      s.myBestReignMs = Math.max(s.myBestReignMs, ms);
+    }
+    const rt = this.state.rooms[cfg.id];
+    if (ms > (rt.throneRecord?.ms ?? 0)) rt.throneRecord = { name: r.name, ms, me: r.owner === ME, at: now };
+  }
+
+  // ---------- Sự kiện bất ngờ ----------
+  private startEvent(cfg: RoomConfig, s: Session, e: SurpriseEvent, now: number) {
+    let text = '';
+    if (e.kind === 'night') {
+      text = `Màn đêm buông xuống! Mọi trạng thái bị ẩn ${SURPRISE.night.durationSec} giây`;
+    } else if (e.kind === 'rain') {
+      e.rainPoints = 0;
+      text = `Mưa điểm! Mỗi giá ra trong ${SURPRISE.rain.durationSec} giây tới được +${SURPRISE.rain.pointsPerBid} điểm săn`;
+    } else {
+      e.reveal = this.findDupZone(cfg, s);
+      const r = e.reveal;
+      text = r.dupPrices.length
+        ? `Hé lộ: vùng ${fmtVnd(r.from)} – ${fmtVnd(r.to)} có ${r.dupPrices.length} mức giá đang bị trùng`
+        : `Hé lộ: vùng ${fmtVnd(r.from)} – ${fmtVnd(r.to)} chưa có mức giá nào bị trùng`;
+    }
+    this.pushFeed(s, text, 'event', now);
+    if (s.myJoined) this.emit({ type: 'surprise', roomId: cfg.id, roomName: cfg.name, kind: e.kind, text });
+  }
+  /** Tìm vùng giá (SURPRISE.reveal.levels mức liên tiếp) có nhiều mức bị trùng nhất, trong vùng giá người chơi hay chọn */
+  private findDupZone(cfg: RoomConfig, s: Session): NonNullable<SurpriseEvent['reveal']> {
+    const rule = priceRule(cfg);
+    const L = Math.min(SURPRISE.reveal.levels, rule.levels);
+    const counts = countPrices(s.bids);
+    const lastStart = Math.max(1, Math.min(rule.levels - L + 1, cfg.bots.typicalSteps * 3));
+    let best = { k: 1, dups: -1, bids: 0 };
+    for (let k = 1; k <= lastStart; k++) {
+      let dups = 0;
+      let bids = 0;
+      for (let j = k; j < k + L; j++) {
+        const c = counts.get(j * rule.step) ?? 0;
+        if (c > 1) {
+          dups++;
+          bids += c;
+        }
+      }
+      if (dups > best.dups) best = { k, dups, bids };
+    }
+    const dupPrices: number[] = [];
+    for (let j = best.k; j < best.k + L; j++) if ((counts.get(j * rule.step) ?? 0) > 1) dupPrices.push(j * rule.step);
+    return { from: best.k * rule.step, to: (best.k + L - 1) * rule.step, step: rule.step, dupPrices, dupBids: best.bids };
   }
 
   // =================================================================
@@ -526,6 +708,7 @@ export class GameStore {
   private resolve(cfg: RoomConfig, rt: RoomRuntime, s: Session) {
     // xử lý nốt các giá đã lên lịch trước giờ đóng
     this.runSessionTail(cfg, s);
+    if (s.reign) this.endReign(cfg, s, s.endAt - cfg.freezeSec * 1000);
     // Công cụ demo: hỗ trợ thắng — bỏ giá thợ săn ảo ở mức bằng hoặc thấp hơn giá thấp nhất của bạn
     let demoBoost = false;
     const chance = this.state.profile.demoWinChance ?? 0;
@@ -604,6 +787,7 @@ export class GameStore {
       nearMiss,
       demoBoost,
       pointsEarned: 0,
+      throne: { myTotalMs: s.myThroneMs, myBestMs: s.myBestReignMs, record: rt.throneRecord ?? null, newRecord: s.brokeRecord },
     };
 
     const now = s.endAt;
@@ -672,7 +856,7 @@ export class GameStore {
     return roomCfg(roomId).tools.scan + bonus;
   }
 
-  placeBid(roomId: string, priceSteps: number): { ok: boolean; error?: string } {
+  placeBid(roomId: string, priceSteps: number): { ok: boolean; error?: string; rainBonus?: number } {
     const now = Date.now();
     const cfg = roomCfg(roomId);
     const s = this.state.rooms[roomId].session;
@@ -697,11 +881,20 @@ export class GameStore {
       this.addHuntPoints(HUNT_POINTS.joinSession, s);
     }
     this.markPlayed(now);
-    // cập nhật ngay trạng thái dẫn đầu (không chờ tick)
-    if (!isFrozen(s, now)) {
+    // Mưa điểm: thưởng điểm săn cho mỗi giá ra trong lúc mưa
+    let rainBonus = 0;
+    const rain = isRain(s, now) && !isFrozen(s, now) ? s.events.find((e) => e.kind === 'rain' && now >= e.at && now < e.until) : undefined;
+    if (rain) {
+      rainBonus = SURPRISE.rain.pointsPerBid;
+      rain.rainPoints = (rain.rainPoints ?? 0) + rainBonus;
+      this.addHuntPoints(rainBonus, s);
+    }
+    // cập nhật ngay trạng thái dẫn đầu (không chờ tick). Màn đêm: giữ bí mật đến khi trời sáng.
+    if (!isFrozen(s, now) && !isNight(s, now)) {
       const counts = countPrices(s.bids);
       const lu = lowestUnique(counts);
       const leaderBid = lu === null ? null : s.bids.find((b) => b.price === lu)!;
+      this.trackReign(cfg, s, leaderBid?.owner ?? null, now);
       if (leaderBid && leaderBid.owner === ME && s.myLeadBidId !== leaderBid.id) {
         s.myLeadBidId = leaderBid.id;
         s.leadSince = now;
@@ -714,7 +907,7 @@ export class GameStore {
       }
     }
     this.changed(true);
-    return { ok: true };
+    return { ok: true, rainBonus };
   }
 
   /** Soi vùng giá: đếm số mức chưa ai chọn trong khoảng [from, to] (theo bước giá) */
@@ -729,6 +922,7 @@ export class GameStore {
     const s = this.state.rooms[roomId].session;
     if (!s || !isRunning(s, now)) return { ok: false, error: 'Tổ không trong phiên' };
     if (isFrozen(s, now)) return { ok: false, error: 'Không dùng được trong giai đoạn đóng băng' };
+    if (isNight(s, now)) return { ok: false, error: 'Màn đêm: công cụ tạm khóa đến khi trời sáng' };
     if (s.toolsUsed.scan >= this.scanQuota(roomId)) return { ok: false, error: 'Đã hết lượt Soi vùng giá của phiên này' };
     const c = Math.round(centerVnd / rule.step);
     const lo = Math.max(1, Math.min(c - SCAN_HALF, rule.levels - 2 * SCAN_HALF));
@@ -764,6 +958,7 @@ export class GameStore {
     const s = this.state.rooms[roomId].session;
     if (!s || !isRunning(s, now)) return { ok: false, error: 'Tổ không trong phiên' };
     if (isFrozen(s, now)) return { ok: false, error: 'Không dùng được trong giai đoạn đóng băng' };
+    if (isNight(s, now)) return { ok: false, error: 'Màn đêm: công cụ tạm khóa đến khi trời sáng' };
     if (s.toolsUsed.thermo >= cfg.tools.thermo) return { ok: false, error: 'Đã hết lượt Nhiệt kế của phiên này' };
     const lu = lowestUnique(countPrices(s.bids));
     s.toolsUsed.thermo++;
@@ -1056,6 +1251,10 @@ export class GameStore {
       s.endAt += delta;
       s.botJoins.forEach((j) => (j.at += delta));
       s.schedule.forEach((j) => (j.at += delta));
+      s.events.forEach((e) => {
+        e.at += delta;
+        e.until += delta;
+      });
       return;
     }
     const oldEnd = s.endAt;
@@ -1064,6 +1263,38 @@ export class GameStore {
     s.botJoins.forEach((j) => (j.at = squash(j.at)));
     s.schedule.forEach((j) => (j.at = squash(j.at)));
     s.endAt = newEnd;
+    // sự kiện chưa diễn ra: bỏ đi nếu không còn đủ chỗ trước giai đoạn đóng băng
+    const freezeAt = newEnd - roomCfg(s.roomId).freezeSec * 1000;
+    s.events = s.events.filter((e) => e.started || e.at + 3000 < freezeAt);
+    s.events.forEach((e) => {
+      if (e.started) {
+        if (!e.ended) e.until = Math.min(e.until, freezeAt);
+        return;
+      }
+      const d = e.until - e.at;
+      e.at = Math.max(fromNow, squash(e.at));
+      e.until = Math.min(freezeAt, e.at + d);
+    });
+  }
+
+  /** Công cụ demo: gọi ngay một sự kiện bất ngờ trong tổ */
+  demoTriggerEvent(roomId: string, kind: SurpriseKind): string | null {
+    const now = Date.now();
+    const cfg = roomCfg(roomId);
+    const s = this.state.rooms[roomId].session;
+    if (!s || !isRunning(s, now)) return 'Tổ không trong phiên';
+    const freezeAt = s.endAt - cfg.freezeSec * 1000;
+    const d = SURPRISE[kind].durationSec * 1000;
+    if (now + d > freezeAt) return 'Không đủ thời gian trước giai đoạn đóng băng';
+    // kết thúc sự kiện đang chạy, bỏ các sự kiện sắp tới bị chồng lên
+    for (const e of s.events) if (e.started && !e.ended && now < e.until) e.until = now;
+    s.events = s.events.filter((e) => e.started || e.at > now + d + SURPRISE.gapSec * 1000);
+    const ev: SurpriseEvent = { id: uid('ev'), kind, at: now, until: now + d, started: false };
+    s.events.push(ev);
+    s.events.sort((a, b) => a.at - b.at);
+    if (kind === 'rain') addRainBids(s, ev);
+    this.tick();
+    return null;
   }
   demoBreakReminder() {
     this.emit({ type: 'break' });

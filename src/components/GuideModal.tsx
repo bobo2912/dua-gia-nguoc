@@ -161,14 +161,33 @@ const PAGES: Page[] = [
     ),
   },
   {
+    title: 'Ngai vàng và sự kiện bất ngờ',
+    body: (
+      <div className="col" style={{ gap: 14 }}>
+        <Point icon="👑" title="Ngồi ngai càng lâu càng nhiều điểm">
+          Đang dẫn đầu là bạn ngồi <b>Ngai vàng</b>. Đồng hồ đếm thời gian giữ ngai; qua mỗi mốc được thưởng điểm săn, phá kỷ lục của tổ được thưởng thêm.
+        </Point>
+        <Point icon="🌙" title="Màn đêm">
+          Mọi trạng thái bị ẩn một lúc, công cụ tạm khóa. Ai cũng phải ra giá mù, trời sáng mới biết ai trùng.
+        </Point>
+        <Point icon="👁" title="Hé lộ">
+          Hệ thống công bố một vùng giá đang có nhiều giá trùng. Cả tổ cùng thấy, tranh thủ né đi!
+        </Point>
+        <Point icon="🌧" title="Mưa điểm">
+          Mỗi giá ra trong lúc mưa được thêm điểm săn. Sự kiện đến bất ngờ và áp dụng như nhau cho mọi người trong tổ.
+        </Point>
+      </div>
+    ),
+  },
+  {
     title: 'Giây cuối và gõ búa',
     body: (
       <div className="col" style={{ gap: 14 }}>
         <Point icon="❄" title="Đóng băng những giây cuối">
           Gần hết giờ, trạng thái ngừng cập nhật. Bạn vẫn ra giá được nhưng không biết ai trùng, ai dẫn đầu — hồi hộp tới phút chót.
         </Point>
-        <Point icon="🔨" title="Gõ búa công bố kết quả">
-          Kết quả kèm mã kiểm chứng và bảng giá ẩn danh để ai cũng tự đối chiếu được.
+        <Point icon="🃏" title="Gõ búa, lật bài">
+          Búa gõ xong, các mức giá được lật lần lượt từ thấp lên: mức trùng bị loại, mức <b>duy nhất</b> đầu tiên thắng. Kết quả kèm mã kiểm chứng và bảng giá ẩn danh.
         </Point>
         <Point icon="🍯" title="Không ai duy nhất?">
           Quà được dồn vào <b>Hũ mật</b> cho phiên sau (phòng có Hũ mật sẽ phát sáng ở sảnh), hoặc phiên bị hủy tùy loại quà.

@@ -1,9 +1,9 @@
 import { priceRule } from '../config';
 import { roomCfg } from '../engine/game';
-import { fmtDate, fmtTime, fmtVnd } from '../engine/util';
+import { fmtDate, fmtDur, fmtTime, fmtVnd } from '../engine/util';
 import { useGame, useNav } from '../nav';
 import { Bee } from '../components/Bee';
-import { IcBack, IcGavel, IcShield } from '../components/Icons';
+import { IcBack, IcCrown, IcGavel, IcShield } from '../components/Icons';
 import { ME } from '../engine/types';
 
 export function Result({ sessionId }: { sessionId: string }) {
@@ -118,6 +118,9 @@ export function Result({ sessionId }: { sessionId: string }) {
         <div className="xs muted" style={{ textAlign: 'center' }}>
           {r.participants.toLocaleString('vi-VN')} thợ săn · {r.totalBids.toLocaleString('vi-VN')} lượt ra giá
         </div>
+        <button className="btn outline sm" onClick={() => nav.openReveal(sessionId)}>
+          Xem lại màn lật bài
+        </button>
       </div>
 
       {!iWon && r.my.length > 0 && (
@@ -212,6 +215,19 @@ export function Result({ sessionId }: { sessionId: string }) {
                 </span>
               </div>
             ))}
+            {r.throne && (r.throne.myTotalMs > 0 || r.throne.newRecord) && (
+              <div className="bidrow" style={{ padding: '10px 14px', gap: 8 }}>
+                <IcCrown size={16} color="#D4A017" />
+                <span className="grow small">
+                  Ngồi ngai tổng <b>{fmtDur(r.throne.myTotalMs)}</b> · lâu nhất <b>{fmtDur(r.throne.myBestMs)}</b>
+                </span>
+                {r.throne.newRecord && (
+                  <span className="pill unique" style={{ fontSize: 12 }}>
+                    Phá kỷ lục
+                  </span>
+                )}
+              </div>
+            )}
             <div className="row" style={{ padding: '12px 14px', background: 'var(--ink)', color: 'var(--cream)', borderRadius: '0 0 18px 18px' }}>
               <span className="grow small">Điểm săn nhận được</span>
               <span className="display" style={{ fontSize: 20, fontWeight: 800, color: 'var(--honey)' }}>

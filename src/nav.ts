@@ -22,6 +22,8 @@ export interface Nav {
   openGuide: () => void;
   openTool: (kind: 'scan' | 'thermo', roomId: string, center: number) => void;
   toast: (text: string, tone?: 'good' | 'warn' | 'info') => void;
+  /** Xem lại màn lật bài của một phiên đã gõ búa */
+  openReveal: (sessionId: string) => void;
   /** Kiểm tra bản mới trên máy chủ; hiện nút cập nhật nếu có */
   checkUpdate: (manual?: boolean) => Promise<void>;
 }

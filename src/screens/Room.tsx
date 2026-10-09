@@ -1,25 +1,27 @@
 import { useEffect, useState } from 'react';
-import { isFrozen, isRunning, myBids, participantsOf, roomCfg, visibleStatuses } from '../engine/game';
+import { activeEvent, isFrozen, isNight, isRunning, myBids, participantsOf, roomCfg, visibleStatuses } from '../engine/game';
 import type { BidStatus } from '../engine/types';
 import { fmtAgo, fmtClock, fmtVnd, randInt } from '../engine/util';
 import { useGame, useNav } from '../nav';
-import { priceRule } from '../config';
+import { priceRule, SURPRISE, type SurpriseKind } from '../config';
+import { EventBanner, ThroneCard } from '../components/Surprise';
 import { PriceInput, snapPrice } from '../components/PriceInput';
 import { PICK_EVENT } from '../components/ToolSheet';
 import { Bee } from '../components/Bee';
-import { IcBack, IcBell, IcCircle, IcCrown, IcDrop, IcGavel, IcLock, IcSearch, IcSnow, IcThermo, IcX } from '../components/Icons';
+import { IcBack, IcBell, IcCircle, IcCrown, IcDrop, IcGavel, IcLock, IcMoon, IcSearch, IcSnow, IcThermo, IcX } from '../components/Icons';
 
 const STATUS_LABEL: Record<BidStatus, string> = {
   leading: 'Đang dẫn đầu',
   unique: 'Duy nhất',
   dup: 'Bị trùng',
   pending: 'Chờ gõ búa',
+  hidden: 'Ẩn trong màn đêm',
 };
 
 function StatusPill({ status, frozen }: { status: BidStatus; frozen: boolean }) {
   return (
     <span className={`pill ${status}`}>
-      {frozen && status !== 'pending' ? <IcLock size={12} /> : status === 'leading' ? <IcCrown /> : status === 'dup' ? <IcX /> : status === 'unique' ? <IcCircle /> : null}
+      {frozen && status !== 'pending' ? <IcLock size={12} /> : status === 'leading' ? <IcCrown /> : status === 'dup' ? <IcX /> : status === 'unique' ? <IcCircle /> : status === 'hidden' ? <IcMoon size={12} /> : null}
       {STATUS_LABEL[status]}
       {frozen && status !== 'pending' ? ' lúc đóng băng' : ''}
     </span>
@@ -84,6 +86,9 @@ export function Room({ roomId }: { roomId: string }) {
   const bal = g.balance(now);
   const entry = g.canEnter(roomId, now);
   const leading = !frozen && statuses.find((x) => x.status === 'leading');
+  const night = running && isNight(s, now);
+  const ev = running && !frozen ? activeEvent(s, now) : null;
+  const throneRecord = g.state.rooms[roomId].throneRecord;
   const bidsPerMin = s.bids.filter((b) => b.at > now - 60000).length;
   const allPrizes = [...s.prizes, ...s.jackpot];
   const remaining = s.endAt - now;
@@ -112,7 +117,7 @@ export function Room({ roomId }: { roomId: string }) {
       return;
     }
     setErr('');
-    setFlash(`Đã ra giá ${fmtVnd(price)}`);
+    setFlash(r.rainBonus ? `Đã ra giá ${fmtVnd(price)} · +${r.rainBonus} điểm săn (Mưa điểm)` : `Đã ra giá ${fmtVnd(price)}`);
     scrollBidToTop();
     try {
       navigator.vibrate?.(30);
@@ -133,7 +138,7 @@ export function Room({ roomId }: { roomId: string }) {
           : '';
 
   return (
-    <div className={`scroll room ${frozen ? 'frozen' : ''}`}>
+    <div className={`scroll room ${frozen ? 'frozen' : night ? 'night' : ''}`}>
       {/* ---------- Header ---------- */}
       <header className="hdr" style={frozen ? { borderRadius: 0 } : undefined}>
         <div className="hdr-row">
@@ -213,6 +218,13 @@ export function Room({ roomId }: { roomId: string }) {
         )}
       </header>
 
+      {/* ---------- Sự kiện bất ngờ ---------- */}
+      {ev && (
+        <div className="section">
+          <EventBanner s={s} now={now} myBidPrices={new Set(mine.map((b) => b.price))} />
+        </div>
+      )}
+
       {/* ---------- Đóng băng ---------- */}
       {frozen && (
         <div className="section">
@@ -253,7 +265,7 @@ export function Room({ roomId }: { roomId: string }) {
         <div
           id="bid-card"
           className="card"
-          style={{ padding: 14, gap: 10, ...(frozen ? { background: 'rgba(255,246,224,0.06)', borderColor: 'var(--cream)', boxShadow: 'none', color: 'var(--cream)' } : {}) }}
+          style={{ padding: 14, gap: 10, ...(frozen || night ? { background: 'rgba(255,246,224,0.06)', borderColor: 'var(--cream)', boxShadow: 'none', color: 'var(--cream)' } : {}) }}
         >
           <div className="row between">
             <h2 className="section-title" style={{ fontSize: 17 }}>
@@ -263,18 +275,20 @@ export function Room({ roomId }: { roomId: string }) {
               Ví còn <b>{bal}</b> giọt
             </span>
           </div>
-          <PriceInput rule={rule} text={priceText} onText={(t) => { setErr(''); setPriceText(t); }} onSubmit={submit} typicalSteps={cfg.bots.typicalSteps} dark={frozen} onFocus={() => scrollBidToTop(350)} />
+          <PriceInput rule={rule} text={priceText} onText={(t) => { setErr(''); setPriceText(t); }} onSubmit={submit} typicalSteps={cfg.bots.typicalSteps} dark={frozen || night} onFocus={() => scrollBidToTop(350)} />
           <button className="btn big" style={{ height: 48, fontSize: 18 }} onClick={submit} disabled={!canBid}>
             <IcGavel size={20} color="#1C1712" />
             Ra giá · 1 giọt mật
           </button>
           <div className="xs" style={{ textAlign: 'center', opacity: 0.8, minHeight: 18 }} aria-live="polite">
             {err ? (
-              <span style={{ color: frozen ? '#FF8A73' : 'var(--dup-text)', fontWeight: 700, fontSize: 13 }}>{err}</span>
+              <span style={{ color: frozen || night ? '#FF8A73' : 'var(--dup-text)', fontWeight: 700, fontSize: 13 }}>{err}</span>
             ) : flash ? (
-              <span style={{ color: frozen ? 'var(--honey)' : 'var(--lead)', fontWeight: 700, fontSize: 13 }}>{flash}</span>
+              <span style={{ color: frozen || night ? 'var(--honey)' : 'var(--lead)', fontWeight: 700, fontSize: 13 }}>{flash}</span>
             ) : bidBlockReason ? (
               <span style={{ fontWeight: 600 }}>{bidBlockReason}</span>
+            ) : night ? (
+              <span style={{ fontWeight: 600 }}>Màn đêm: giá vẫn được ghi nhận, trạng thái lộ ra khi trời sáng.</span>
             ) : (
               <>
                 Giá đã ra không rút lại được.
@@ -311,14 +325,14 @@ export function Room({ roomId }: { roomId: string }) {
               <button
                 key={k}
                 className="card"
-                disabled={frozen || left <= 0}
-                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: '10px 12px', boxShadow: 'none', textAlign: 'left', minHeight: 72, background: frozen ? 'transparent' : '#fff', color: 'inherit', borderColor: frozen ? 'rgba(255,246,224,0.3)' : 'var(--ink)' }}
+                disabled={frozen || night || left <= 0}
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: '10px 12px', boxShadow: 'none', textAlign: 'left', minHeight: 72, background: frozen || night ? 'transparent' : '#fff', color: 'inherit', borderColor: frozen || night ? 'rgba(255,246,224,0.3)' : 'var(--ink)' }}
                 onClick={() => nav.openTool(k, roomId, price || cfg.bots.typicalSteps * rule.step)}
               >
                 {k === 'scan' ? <IcSearch /> : <IcThermo />}
                 <span className="col">
                   <b style={{ fontSize: 14 }}>{k === 'scan' ? 'Soi vùng giá' : 'Nhiệt kế'}</b>
-                  <span className="xs muted">{frozen ? 'Khóa khi đóng băng' : `Còn ${left} lần`}</span>
+                  <span className="xs muted">{frozen ? 'Khóa khi đóng băng' : night ? 'Khóa trong màn đêm' : `Còn ${left} lần`}</span>
                 </span>
               </button>
             );
@@ -326,42 +340,13 @@ export function Room({ roomId }: { roomId: string }) {
         </div>
       )}
 
-      {/* ---------- Trạng thái của tôi ---------- */}
+      {/* ---------- Ngai vàng ---------- */}
       {!frozen && running && (
         <div className="section">
-          {leading ? (
-            <div className="row" style={{ background: 'var(--lead-soft)', border: '2px solid var(--lead)', borderRadius: 20, padding: '12px 14px', gap: 12 }}>
-              <Bee size={64} mood="joy" />
-              <div className="col" style={{ gap: 2 }}>
-                <div className="display" style={{ fontSize: 20, fontWeight: 800, color: 'var(--lead)' }}>
-                  Bạn đang dẫn đầu!
-                </div>
-                <div className="small">
-                  Giá <b>{fmtVnd(leading.bid.price)}</b> đang thấp nhất và duy nhất.
-                </div>
-                {s.leadSince && (
-                  <div className="small" style={{ fontWeight: 600 }}>
-                    Giữ ngôi {fmtClock(now - s.leadSince)}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : mine.length ? (
-            <div className="row" style={{ background: 'var(--honey-soft)', border: '2px solid var(--honey-deep)', borderRadius: 20, padding: '12px 14px', gap: 12 }}>
-              <Bee size={60} mood="worried" />
-              <div className="col" style={{ gap: 2 }}>
-                <div className="display" style={{ fontSize: 20, fontWeight: 800 }}>
-                  Chưa giữ ngôi đầu
-                </div>
-                <div className="small">Có giá duy nhất thấp hơn giá của bạn. Thử một mức khác?</div>
-              </div>
-            </div>
-          ) : (
-            <div className="row" style={{ background: '#fff', border: '1.5px solid var(--line)', borderRadius: 20, padding: '12px 14px', gap: 12 }}>
-              <Bee size={60} mood="happy" gavel="side" />
-              <div className="small" style={{ lineHeight: 1.5 }}>
-                Ra giá <b>thấp nhất</b> mà <b>không trùng</b> với ai khi búa gõ là thắng. Mỗi lần ra giá tốn 1 giọt mật.
-              </div>
+          <ThroneCard s={s} now={now} record={throneRecord} night={night} myLeadPrice={leading ? leading.bid.price : null} hasBids={mine.length > 0} />
+          {mine.length === 0 && !night && (
+            <div className="xs muted" style={{ textAlign: 'center', lineHeight: 1.5 }}>
+              Ra giá <b>thấp nhất</b> mà <b>không trùng</b> với ai khi búa gõ là thắng. Mỗi lần ra giá tốn 1 giọt mật.
             </div>
           )}
         </div>
@@ -400,7 +385,7 @@ export function Room({ roomId }: { roomId: string }) {
             <div
               key={f.id}
               className="row"
-              style={{ padding: '10px 12px', borderRadius: 14, background: frozen ? 'rgba(255,246,224,0.06)' : '#fff', fontSize: 14, gap: 10 }}
+              style={{ padding: '10px 12px', borderRadius: 14, background: frozen || night ? 'rgba(255,246,224,0.06)' : '#fff', fontSize: 14, gap: 10 }}
             >
               <span
                 style={{
@@ -408,19 +393,40 @@ export function Room({ roomId }: { roomId: string }) {
                   height: 8,
                   borderRadius: 4,
                   flexShrink: 0,
-                  background: f.tone === 'me' ? 'var(--lead)' : f.tone === 'lead' ? 'var(--honey)' : f.tone === 'dup' ? 'var(--dup)' : f.tone === 'freeze' ? 'var(--ice)' : 'var(--gold)',
+                  background: f.tone === 'me' ? 'var(--lead)' : f.tone === 'lead' ? 'var(--honey)' : f.tone === 'dup' ? 'var(--dup)' : f.tone === 'freeze' ? 'var(--ice)' : f.tone === 'event' ? '#7B6CF0' : f.tone === 'throne' ? 'var(--honey-deep)' : 'var(--gold)',
                 }}
               />
-              <span className="grow" style={{ fontWeight: f.tone === 'me' ? 700 : 400 }}>
+              <span className="grow" style={{ fontWeight: f.tone === 'me' || f.tone === 'throne' || f.tone === 'event' ? 700 : 400 }}>
                 {f.text}
               </span>
               <span className="xs muted">{fmtAgo(now, f.at)}</span>
             </div>
           ))}
         </div>
-        <button className="btn link" style={{ alignSelf: 'center', fontSize: 13, color: frozen ? '#C9BDA8' : undefined }} onClick={() => g.demoFastForward(roomId)}>
+        <button className="btn link" style={{ alignSelf: 'center', fontSize: 13, color: frozen || night ? '#C9BDA8' : undefined }} onClick={() => g.demoFastForward(roomId)}>
           Công cụ demo: tua đến sát {cfg.freezeSec} giây cuối
         </button>
+        {running && !frozen && (
+          <div className="row" style={{ justifyContent: 'center', flexWrap: 'wrap', gap: 6 }}>
+            <span className="xs muted" style={{ width: '100%', textAlign: 'center' }}>
+              Công cụ demo: gọi sự kiện ngay
+            </span>
+            {(['night', 'reveal', 'rain'] as SurpriseKind[]).map((k) => (
+              <button
+                key={k}
+                className="btn outline sm"
+                style={{ height: 36, fontSize: 13, padding: '0 12px', ...(night ? { background: 'transparent', color: 'var(--cream)', borderColor: 'rgba(255,246,224,0.4)' } : {}) }}
+                onClick={() => {
+                  const e = g.demoTriggerEvent(roomId, k);
+                  if (e) nav.toast(e, 'warn');
+                  else window.setTimeout(() => document.getElementById('bid-card')?.closest('.scroll')?.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+                }}
+              >
+                {SURPRISE[k].name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {/* chừa chỗ để khung Ra giá luôn cuộn được lên đầu màn hình */}
       <div aria-hidden="true" style={{ height: '30vh' }} />
