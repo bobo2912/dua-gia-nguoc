@@ -120,6 +120,12 @@ export function activeEvent(s: Session, now: number): SurpriseEvent | null {
   }
   return null;
 }
+/** Sự kiện kế tiếp chưa diễn ra (để đếm ngược), null nếu không còn */
+export function nextEvent(s: Session, now: number): SurpriseEvent | null {
+  let best: SurpriseEvent | null = null;
+  for (const e of s.events ?? []) if (!e.started && e.at > now && (!best || e.at < best.at)) best = e;
+  return best;
+}
 const eventOn = (s: Session, now: number, kind: SurpriseKind) => (s.events ?? []).some((e) => e.kind === kind && now >= e.at && now < e.until);
 export const isNight = (s: Session, now: number) => eventOn(s, now, 'night');
 export const isRain = (s: Session, now: number) => eventOn(s, now, 'rain');

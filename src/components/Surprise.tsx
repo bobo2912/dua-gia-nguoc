@@ -1,11 +1,34 @@
 // Ngai vàng và sự kiện bất ngờ trong phòng săn
 import { SURPRISE, THRONE } from '../config';
-import { activeEvent } from '../engine/game';
+import { activeEvent, nextEvent } from '../engine/game';
 import { ME, type Session, type ThroneRecord } from '../engine/types';
 import { fmtClock, fmtDur, fmtSec, fmtVnd } from '../engine/util';
 import { Bee } from './Bee';
 import { IcCrown, IcEye, IcMoon, IcRain, IcX } from './Icons';
 import { PICK_EVENT } from './ToolSheet';
+
+// ------------------------- Đếm ngược tới sự kiện -------------------------
+/** Cho người chơi biết sắp có sự kiện, nhưng giữ bí mật là sự kiện gì */
+export function NextEventStrip({ s, now }: { s: Session; now: number }) {
+  const e = nextEvent(s, now);
+  if (!e) return null;
+  const left = e.at - now;
+  const soon = left <= 10000;
+  return (
+    <div className={`next-event ${soon ? 'soon' : ''}`} role="timer" aria-label={`Sự kiện bất ngờ sau ${fmtClock(left)}`}>
+      <span className="next-icons" aria-hidden="true">
+        <IcMoon size={16} />
+        <IcEye size={16} />
+        <IcRain size={16} />
+      </span>
+      <span className="grow" style={{ lineHeight: 1.3 }}>
+        <b>{soon ? 'Sự kiện sắp xảy ra!' : 'Sự kiện bất ngờ sắp đến'}</b>
+        <span className="xs next-sub">Màn đêm, Hé lộ hay Mưa điểm? Đến giờ mới biết</span>
+      </span>
+      <span className={`display next-clock ${soon ? 'pulse' : ''}`}>{fmtClock(left)}</span>
+    </div>
+  );
+}
 
 // ------------------------- Băng sự kiện -------------------------
 export function EventBanner({ s, now, myBidPrices }: { s: Session; now: number; myBidPrices: Set<number> }) {

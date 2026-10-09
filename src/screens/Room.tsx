@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { activeEvent, isFrozen, isNight, isRunning, myBids, participantsOf, roomCfg, visibleStatuses } from '../engine/game';
+import { activeEvent, nextEvent, isFrozen, isNight, isRunning, myBids, participantsOf, roomCfg, visibleStatuses } from '../engine/game';
 import type { BidStatus } from '../engine/types';
 import { fmtAgo, fmtClock, fmtVnd, randInt } from '../engine/util';
 import { useGame, useNav } from '../nav';
 import { priceRule, SURPRISE, type SurpriseKind } from '../config';
-import { EventBanner, ThroneCard } from '../components/Surprise';
+import { EventBanner, NextEventStrip, ThroneCard } from '../components/Surprise';
 import { PriceInput, snapPrice } from '../components/PriceInput';
 import { PICK_EVENT } from '../components/ToolSheet';
 import { Bee } from '../components/Bee';
@@ -219,10 +219,18 @@ export function Room({ roomId }: { roomId: string }) {
       </header>
 
       {/* ---------- Sự kiện bất ngờ ---------- */}
-      {ev && (
+      {ev ? (
         <div className="section">
           <EventBanner s={s} now={now} myBidPrices={new Set(mine.map((b) => b.price))} />
         </div>
+      ) : (
+        running &&
+        !frozen &&
+        nextEvent(s, now) && (
+          <div className="section">
+            <NextEventStrip s={s} now={now} />
+          </div>
+        )
       )}
 
       {/* ---------- Đóng băng ---------- */}

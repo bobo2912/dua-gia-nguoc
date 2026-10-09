@@ -28,10 +28,18 @@ const safeTop = () => probe('top:0;padding-top:env(safe-area-inset-top,0px)', (e
 /** Chiều cao vùng mà trình duyệt thực sự dùng để hiển thị phần tử cố định */
 const fixedHeight = () => probe('top:0;bottom:0', (el) => el.getBoundingClientRect().height);
 
+/** Đang gõ vào ô nhập (bàn phím ảo có thể đang mở) */
+function typing(): boolean {
+  const a = document.activeElement as HTMLElement | null;
+  return !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable);
+}
+let lastH = 0;
+
 function fitHeight() {
   const root = document.documentElement;
   if (window.innerWidth >= 520) {
     root.style.removeProperty('--app-h');
+    lastH = 0;
     return;
   }
   const fixed = fixedHeight();
@@ -47,6 +55,10 @@ function fitHeight() {
     // Thanh trạng thái đặc (nền trắng/đen): lấy số NHỎ nhất để menu dưới không bao giờ bị cắt
     h = Math.min(fixed || vv, vv, window.innerHeight);
   }
+  // Bàn phím iPhone bật lên: màn hình nhìn thấy co lại và iPhone tự đẩy trang lên để lộ ô nhập.
+  // Nếu app co theo, nó bị đẩy lên trên và lộ khoảng nền trắng phía dưới. Giữ nguyên chiều cao cũ.
+  if (lastH && typing() && h < lastH - 100) return;
+  lastH = h;
   root.style.setProperty('--app-h', `${Math.round(h)}px`);
 }
 fitHeight();
@@ -54,6 +66,14 @@ window.addEventListener('resize', fitHeight);
 window.addEventListener('orientationchange', () => setTimeout(fitHeight, 300));
 window.visualViewport?.addEventListener('resize', fitHeight);
 document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && setTimeout(fitHeight, 100));
+// Bàn phím đóng: đưa trang về đúng vị trí (iPhone đôi khi để trang lệch sau khi gõ) rồi đo lại
+document.addEventListener('focusout', () =>
+  setTimeout(() => {
+    if (typing()) return;
+    if (window.scrollY || document.documentElement.scrollTop) window.scrollTo(0, 0);
+    fitHeight();
+  }, 120),
+);
 
 // ---------- Chặn phóng to / thu nhỏ ----------
 // iPhone bỏ qua user-scalable=no trong Safari, nên chặn thêm cử chỉ chụm 2 ngón và chạm đúp.

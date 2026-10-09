@@ -397,3 +397,15 @@ input, select, textarea { font-size: max(16px, 1em); }
 @keyframes confetti-fall { to { transform: translateY(105vh) rotate(540deg); } }
 .room.night .card:not(.flat) { color: var(--ink); }
 .room.night .card:not(.flat) .muted { color: var(--muted); }
+
+/* ------- Đếm ngược tới sự kiện ------- */
+.next-event {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 16px;
+  background: #ece8ff; color: #2b2266; border: 1.5px dashed #7b6cf0;
+}
+.next-event.soon { background: #2b2266; color: #fff; border-style: solid; animation: soon-glow 1s ease-in-out infinite; }
+@keyframes soon-glow { 50% { box-shadow: 0 0 0 4px rgba(123, 108, 240, 0.35); } }
+.next-icons { display: flex; gap: 2px; color: #7b6cf0; flex-shrink: 0; }
+.next-event.soon .next-icons { color: #ffe7a3; }
+.next-sub { display: block; opacity: 0.8; }
+.next-clock { font-size: 26px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; flex-shrink: 0; }
