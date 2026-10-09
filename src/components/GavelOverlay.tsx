@@ -7,56 +7,92 @@ import { fmtVnd } from '../engine/util';
 
 // =====================================================================
 // GÕ BÚA KIỂU "LẬT BÀI"
-// Nhịp 1: búa gõ. Nhịp 2: lật từng mức giá từ thấp lên, mức nào trùng bị loại,
-// đến mức DUY NHẤT đầu tiên là người thắng. Giá của bạn được đánh dấu khi lật tới.
+// Búa gõ và màn lật bài hiện cùng lúc. Có 2 cách lật:
+// - Từ thấp lên (mặc định): mức trùng bị loại dần, mức DUY NHẤT đầu tiên là người thắng.
+// - Từ cao xuống: khi trước giá thắng có quá ít mức để lật (giá thắng gần như thấp nhất phiên),
+//   lật các mức phía trên trước (trùng, duy nhất hạng 3, hạng 2…), giá thắng lật cuối cùng.
+// Lá thắng quà 1 luôn có hồi trống 3 – 2 – 1.
 // =====================================================================
 
 type Step =
-  | { kind: 'level'; price: number; count: number; mine: boolean; winIdx: number | null; drum: boolean }
+  | { kind: 'level'; price: number; count: number; mine: boolean; winIdx: number | null; rank: number | null; drum: boolean }
   | { kind: 'skip'; n: number; bids: number; from: number; to: number };
 
-/** Dựng chuỗi lật bài. Mức không quan trọng ở giữa được gộp lại để màn lật không quá dài. */
-export function buildSteps(r: SessionResult): Step[] {
+export type FlipMode = 'up' | 'down';
+
+/** Số mức tối thiểu cần lật trước lá thắng; ít hơn thì chuyển sang lật từ cao xuống */
+const MIN_BEFORE_WIN = 3;
+/** Lật từ cao xuống: lấy bao nhiêu mức phía trên giá thắng cuối cùng */
+const ABOVE_LEVELS = 7;
+
+/** Dựng chuỗi lật bài. Mức trùng không quan trọng nằm liền nhau được gộp lại để màn lật không quá dài. */
+export function buildSteps(r: SessionResult): { steps: Step[]; mode: FlipMode } {
   const myP = new Set(r.my.map((m) => m.price));
   const winIdx = new Map(r.winners.map((w, i) => [w.price, i]));
+  const uniques = r.counts.filter(([, c]) => c === 1).map(([p]) => p);
   const lastWin = r.winners.length ? r.winners[r.winners.length - 1].price : null;
-  let levels = r.counts.filter(([p]) => lastWin === null || p <= lastWin);
-  if (lastWin === null) levels = levels.slice(0, 40);
-  const n = levels.length;
-  const winPos = levels.map(([p], i) => (winIdx.has(p) ? i : -1)).filter((i) => i >= 0);
-  const keep = levels.map(([p], i) => {
-    if (i < 5 || myP.has(p) || winIdx.has(p)) return true;
+  const firstWin = r.winners.length ? r.winners[0].price : null;
+
+  let order: [number, number][];
+  let mode: FlipMode = 'up';
+  const below = firstWin === null ? 0 : r.counts.filter(([p]) => p < firstWin).length;
+  if (firstWin !== null && below < MIN_BEFORE_WIN) {
+    mode = 'down';
+    const above = r.counts.filter(([p]) => p > lastWin!).slice(0, ABOVE_LEVELS).reverse();
+    const rest = r.counts.filter(([p]) => p <= lastWin! && p !== firstWin).sort((a, b) => b[0] - a[0]);
+    order = [...above, ...rest, r.counts.find(([p]) => p === firstWin)!];
+  } else {
+    order = r.counts.filter(([p]) => lastWin === null || p <= lastWin);
+    if (lastWin === null) order = order.slice(0, 40);
+  }
+
+  const n = order.length;
+  const isWin = (i: number) => winIdx.has(order[i][0]);
+  const winPos = order.map((_, i) => (isWin(i) ? i : -1)).filter((i) => i >= 0);
+  const keep = order.map(([p, c], i) => {
+    if (i < 5 || myP.has(p) || winIdx.has(p) || c === 1) return true;
     if (winPos.some((w) => i < w && w - i <= 4)) return true;
     if (lastWin === null && i >= n - 4) return true;
     return false;
+  });
+  const level = ([p, c]: [number, number]): Step => ({
+    kind: 'level',
+    price: p,
+    count: c,
+    mine: myP.has(p),
+    winIdx: winIdx.get(p) ?? null,
+    rank: c === 1 && !winIdx.has(p) ? uniques.indexOf(p) + 1 : null,
+    drum: false,
   });
   const steps: Step[] = [];
   let i = 0;
   while (i < n) {
     if (keep[i]) {
-      const [p, c] = levels[i];
-      const drum = winPos.some((w) => i < w && w - i <= 3);
-      steps.push({ kind: 'level', price: p, count: c, mine: myP.has(p), winIdx: winIdx.get(p) ?? null, drum });
+      steps.push(level(order[i]));
       i++;
       continue;
     }
     let j = i;
     while (j < n && !keep[j]) j++;
-    const run = levels.slice(i, j);
-    if (run.length >= 3) {
-      steps.push({ kind: 'skip', n: run.length, bids: run.reduce((t, [, c]) => t + c, 0), from: run[0][0], to: run[run.length - 1][0] });
-    } else {
-      for (const [p, c] of run) steps.push({ kind: 'level', price: p, count: c, mine: myP.has(p), winIdx: winIdx.get(p) ?? null, drum: false });
-    }
+    const run = order.slice(i, j);
+    if (run.length >= 3) steps.push({ kind: 'skip', n: run.length, bids: run.reduce((t, [, c]) => t + c, 0), from: run[0][0], to: run[run.length - 1][0] });
+    else for (const lv of run) steps.push(level(lv));
     i = j;
   }
-  return steps;
+  // nhịp chậm lại ở 3 lá trước lá thắng quà 1
+  const top = steps.findIndex((st) => st.kind === 'level' && st.winIdx === 0);
+  for (let k = Math.max(0, top - 3); k < top; k++) {
+    const st = steps[k];
+    if (st.kind === 'level') st.drum = true;
+  }
+  return { steps, mode };
 }
 
 /** Thời gian chờ trước khi lật bước này (ms) */
 function delayOf(st: Step, firstWin: boolean): number {
   if (st.kind === 'skip') return 850;
   if (st.winIdx !== null) return firstWin ? DRUM_MS : 1500;
+  if (st.rank !== null) return 1100;
   if (st.drum) return 1050;
   if (st.mine) return 900;
   return 520;
@@ -80,13 +116,13 @@ export function GavelOverlay({
   done.current = onDone;
   const item = store.state.history.find((h) => h.sessionId === sessionId);
   const r = item?.result;
-  const steps = useMemo(() => (r ? buildSteps(r) : []), [r]);
+  const { steps, mode } = useMemo(() => (r ? buildSteps(r) : { steps: [] as Step[], mode: 'up' as FlipMode }), [r]);
   const iWon = !!r?.winners.some((w) => w.owner === ME) || won;
 
   const [shown, setShown] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const finished = shown >= steps.length;
-  const firstWinPos = steps.findIndex((st) => st.kind === 'level' && st.winIdx !== null);
+  const firstWinPos = steps.findIndex((st) => st.kind === 'level' && st.winIdx === 0);
   /** Lá sắp lật là lá thắng đầu tiên: dành một hồi trống */
   const firstWinNext = !finished && shown === firstWinPos;
 
@@ -174,11 +210,13 @@ export function GavelOverlay({
   const firstWin = r.winners[0];
   const myUniqueAbove = r.my.filter((m) => m.status === 'unique');
 
-  let caption = 'Lật từ giá thấp nhất. Mức nào trùng sẽ bị loại…';
+  let caption = mode === 'down' ? 'Lật từ giá cao xuống. Ai giữ giá thấp nhất mà duy nhất?' : 'Lật từ giá thấp nhất. Mức nào trùng sẽ bị loại…';
   if (firstWinNext) caption = shown === 0 ? 'Mức thấp nhất của phiên… có ai trùng không?' : 'Mức tiếp theo… có ai trùng không?';
   else if (nextStep?.kind === 'level' && nextStep.winIdx !== null) caption = 'Còn một phần quà nữa…';
   else if (nextStep?.kind === 'level' && nextStep.drum) caption = 'Sắp tới rồi…';
+  else if (lastShown?.kind === 'level' && lastShown.mine && lastShown.rank !== null) caption = `Giá của bạn duy nhất, hạng ${lastShown.rank}… nhưng chưa đủ thấp!`;
   else if (lastShown?.kind === 'level' && lastShown.mine && lastShown.winIdx === null) caption = 'Giá của bạn bị trùng mất rồi!';
+  else if (lastShown?.kind === 'level' && lastShown.rank !== null) caption = `Duy nhất, hạng ${lastShown.rank}… vẫn chưa phải thấp nhất!`;
   if (finished) {
     caption = iWon
       ? 'BẠN THẮNG RỒI!'
@@ -228,12 +266,12 @@ export function GavelOverlay({
           st.kind === 'skip' ? (
             <div key={i} className="flip-row skip">
               <span className="grow">
-                {fmtVnd(st.from)} → {fmtVnd(st.to)}: {st.n} mức tiếp theo đều trùng
+                {fmtVnd(st.from)} → {fmtVnd(st.to)}: {st.n} mức đều trùng
               </span>
               <span className="flip-badge dup">{st.bids} lượt</span>
             </div>
           ) : (
-            <div key={i} className={`flip-row ${st.winIdx !== null ? 'win' : 'dup'} ${st.mine ? 'mine' : ''}`}>
+            <div key={i} className={`flip-row ${st.winIdx !== null ? 'win' : st.rank !== null ? 'uniq' : 'dup'} ${st.mine ? 'mine' : ''}`}>
               <span className="display flip-price">{fmtVnd(st.price)}</span>
               {st.mine && <span className="flip-me">BẠN</span>}
               <span className="grow" />
@@ -242,6 +280,8 @@ export function GavelOverlay({
                   <IcCrown size={13} color="#1C1712" />
                   DUY NHẤT{r.winners.length > 1 ? ` · QUÀ ${st.winIdx + 1}` : ''}
                 </span>
+              ) : st.rank !== null ? (
+                <span className="flip-badge uniq">Duy nhất · hạng {st.rank}</span>
               ) : (
                 <span className="flip-badge dup">
                   <IcX size={12} />
