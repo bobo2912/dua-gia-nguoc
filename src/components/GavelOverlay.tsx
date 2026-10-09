@@ -80,29 +80,29 @@ export function GavelOverlay({
   const steps = useMemo(() => (r ? buildSteps(r) : []), [r]);
   const iWon = !!r?.winners.some((w) => w.owner === ME) || won;
 
-  const [phase, setPhase] = useState<'gavel' | 'flip'>(replay ? 'flip' : 'gavel');
   const [shown, setShown] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
-  const finished = phase === 'flip' && shown >= steps.length;
+  const finished = shown >= steps.length;
 
-  // Nhịp 1: búa gõ
+  // Búa gõ và màn lật bài hiện cùng lúc, để người chơi biết kết quả đang được công bố
   useEffect(() => {
-    if (phase !== 'gavel') return;
-    try {
-      navigator.vibrate?.([80, 60, 120]);
-    } catch {
-      /* không hỗ trợ rung */
+    if (!replay) {
+      try {
+        navigator.vibrate?.([80, 60, 120]);
+      } catch {
+        /* không hỗ trợ rung */
+      }
     }
-    const t = window.setTimeout(() => {
-      if (!r) done.current(won ? 'win' : 'result');
-      else setPhase('flip');
-    }, 1500);
-    return () => window.clearTimeout(t);
-  }, [phase, r, won]);
+    // Không có dữ liệu kết quả (hiếm): chỉ gõ búa rồi chuyển sang màn kết quả
+    if (!r) {
+      const t = window.setTimeout(() => done.current(won ? 'win' : 'result'), 1200);
+      return () => window.clearTimeout(t);
+    }
+  }, [r, won, replay]);
 
-  // Nhịp 2: lật từng bước
+  // Lật từng bước
   useEffect(() => {
-    if (phase !== 'flip' || shown >= steps.length) return;
+    if (!r || shown >= steps.length) return;
     const t = window.setTimeout(() => {
       const st = steps[shown];
       setShown((x) => x + 1);
@@ -113,9 +113,9 @@ export function GavelOverlay({
           /* bỏ qua */
         }
       }
-    }, shown === 0 ? 450 : delayOf(steps[shown]));
+    }, shown === 0 ? (replay ? 300 : 650) : delayOf(steps[shown]));
     return () => window.clearTimeout(t);
-  }, [phase, shown, steps]);
+  }, [r, shown, steps, replay]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -126,7 +126,7 @@ export function GavelOverlay({
     else el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [shown, finished, iWon]);
 
-  if (phase === 'gavel' || !r || !item) {
+  if (!r || !item) {
     return (
       <div className="gavel-stage" role="alert" aria-label="Búa đã gõ">
         <div className="slam">
@@ -170,9 +170,16 @@ export function GavelOverlay({
     <div className={`gavel-stage flip-stage ${finished && iWon ? 'won' : ''}`} role="dialog" aria-label="Lật bài kết quả">
       {finished && iWon && <Confetti />}
       <div className="flip-top">
+        <svg className={replay ? '' : 'gavel-hit-once'} width="46" height="46" viewBox="0 0 140 140" aria-hidden="true" style={{ flexShrink: 0 }}>
+          <rect x="62" y="40" width="14" height="86" rx="6" fill="#8A5A00" stroke="#FFF6E0" strokeWidth="5" transform="rotate(-40 69 83)" />
+          <rect x="20" y="20" width="70" height="36" rx="10" fill="#D4A017" stroke="#FFF6E0" strokeWidth="5" transform="rotate(-40 55 38)" />
+        </svg>
         <div className="col grow" style={{ gap: 0 }}>
-          <span className="event-tag" style={{ color: 'var(--honey)' }}>
-            LẬT BÀI · TỔ {item.roomName.toUpperCase()} #{item.no}
+          <span className={`display ${replay ? '' : 'slam-once'}`} style={{ fontSize: 26, fontWeight: 800, lineHeight: 1, color: 'var(--honey)' }}>
+            {replay ? 'XEM LẠI LẬT BÀI' : 'GÕ BÚA!'}
+          </span>
+          <span className="event-tag" style={{ color: '#E9DFC9', marginTop: 3 }}>
+            TỔ {item.roomName.toUpperCase()} #{item.no} · {finished ? 'ĐÃ CÔNG BỐ' : 'ĐANG LẬT BÀI'}
           </span>
           <span className="xs" style={{ color: '#C9BDA8' }}>
             {r.participants.toLocaleString('vi-VN')} thợ săn · {r.totalBids.toLocaleString('vi-VN')} lượt ra giá
@@ -180,7 +187,7 @@ export function GavelOverlay({
         </div>
         {!finished && (
           <button className="chip ghost" onClick={() => setShown(steps.length)}>
-            Bỏ qua
+            Lật hết
           </button>
         )}
       </div>
