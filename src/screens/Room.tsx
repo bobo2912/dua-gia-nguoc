@@ -7,7 +7,6 @@ import { priceRule, SURPRISE, type SurpriseKind } from '../config';
 import { EventBanner, NextEventStrip, ThroneCard } from '../components/Surprise';
 import { PriceInput, snapPrice } from '../components/PriceInput';
 import { PICK_EVENT } from '../components/ToolSheet';
-import { Bee } from '../components/Bee';
 import { IcBack, IcBell, IcCircle, IcCrown, IcDrop, IcGavel, IcLock, IcMoon, IcSearch, IcSnow, IcThermo, IcX } from '../components/Icons';
 
 const STATUS_LABEL: Record<BidStatus, string> = {
@@ -39,17 +38,15 @@ export function Room({ roomId }: { roomId: string }) {
   const price = snapPrice(parseInt(priceText, 10) || 0, rule);
   const [err, setErr] = useState('');
   const [flash, setFlash] = useState('');
-  // Đồng hồ nổi khi đóng băng: hiện khi vòng đếm lớn trên đầu bị cuộn khuất
+  // Đồng hồ nổi khi đóng băng: hiện ở đáy màn hình khi đồng hồ trong ô Ra giá bị cuộn khuất
   const scRef = useRef<HTMLDivElement>(null);
-  const ringRef = useRef<HTMLDivElement>(null);
   const [ringHidden, setRingHidden] = useState(false);
   const checkRing = () => {
-    const r = ringRef.current?.getBoundingClientRect();
     const sc = scRef.current?.getBoundingClientRect();
     const clock = scRef.current?.querySelector('.bid-clock')?.getBoundingClientRect();
     // Ô Ra giá đã có đồng hồ riêng: chỉ hiện đồng hồ nổi (ở đáy màn hình) khi cả vòng đếm lớn lẫn đồng hồ trong ô Ra giá đều khuất
     const clockHidden = !clock || !sc || clock.bottom < sc.top + 4 || clock.top > sc.bottom - 4;
-    setRingHidden(!!r && !!sc && r.bottom < sc.top + 60 && clockHidden);
+    setRingHidden(!!sc && clockHidden);
   };
 
   // nhận giá được chọn từ Soi vùng giá
@@ -210,32 +207,16 @@ export function Room({ roomId }: { roomId: string }) {
         </div>
 
         {frozen ? (
-          <div ref={ringRef} style={{ position: 'relative', height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="210" height="210" viewBox="0 0 240 240" aria-hidden="true">
-              <circle cx="120" cy="120" r="104" fill="none" stroke="rgba(255,246,224,0.12)" strokeWidth="14" />
-              <circle
-                cx="120"
-                cy="120"
-                r="104"
-                fill="none"
-                stroke="#E0452B"
-                strokeWidth="14"
-                strokeLinecap="round"
-                strokeDasharray={`${(Math.max(0, remaining) / freezeTotal) * 653} 654`}
-                transform="rotate(-90 120 120)"
-              />
-            </svg>
-            <div className="col" style={{ position: 'absolute', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.1em', color: '#FF8A73' }}>BÚA SẮP GÕ</span>
-              <span className={`display ${remaining < 10000 ? 'pulse' : ''}`} style={{ fontSize: 64, lineHeight: 1, fontWeight: 800 }} role="timer">
-                {fmtClock(remaining)}
+          // Đóng băng: đồng hồ đã nằm trong ô Ra giá, đầu trang chỉ còn một dòng gọn
+          <div className="row" style={{ gap: 10 }}>
+            <IcSnow color="#7CC3F0" />
+            <div className="col grow" style={{ gap: 2 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.08em', color: '#7CC3F0' }}>
+                ĐÃ ĐÓNG BĂNG · {participantsOf(s).toLocaleString('vi-VN')} THỢ SĂN ĐANG CHỜ
               </span>
-              <span className="small" style={{ opacity: 0.8 }}>
-                {participantsOf(s).toLocaleString('vi-VN')} thợ săn đang chờ
+              <span className="small" style={{ opacity: 0.85 }}>
+                Vẫn ra giá được, kết quả chỉ lộ ra khi búa gõ.
               </span>
-            </div>
-            <div style={{ position: 'absolute', right: -4, top: -4 }} className="shake">
-              <Bee size={84} mood="determined" gavel="raised" onDark />
             </div>
           </div>
         ) : (
@@ -260,18 +241,6 @@ export function Room({ roomId }: { roomId: string }) {
           </div>
         )}
       </header>
-
-      {/* ---------- Đóng băng ---------- */}
-      {frozen && (
-        <div className="section">
-          <div className="row" style={{ background: 'rgba(124,195,240,0.14)', border: '1.5px solid var(--ice)', borderRadius: 16, padding: '12px 14px', alignItems: 'flex-start', gap: 12 }}>
-            <IcSnow color="#7CC3F0" />
-            <div style={{ fontSize: 14, lineHeight: 1.45 }}>
-              <b>Trạng thái đã đóng băng.</b> Bạn vẫn ra giá được, nhưng kết quả chỉ lộ ra khi búa gõ.
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ---------- Quà ---------- */}
       {!frozen && (
@@ -513,8 +482,8 @@ export function Room({ roomId }: { roomId: string }) {
     {frozen && ringHidden && (
       <button
         className={`float-clock ${remaining <= 10000 ? 'hot' : ''} ${remaining <= 5000 ? 'critical' : ''}`}
-        onClick={() => scRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
-        aria-label={`Búa sắp gõ, còn ${fmtClock(remaining)}. Bấm để xem đồng hồ lớn`}
+        onClick={() => scrollBidToTop(0)}
+        aria-label={`Búa sắp gõ, còn ${fmtClock(remaining)}. Bấm để về ô Ra giá`}
       >
         <span className="fc-gavel" aria-hidden="true">
           <IcGavel size={20} color="#FFF6E0" />
