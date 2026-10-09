@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { activeEvent, nextEvent, isFrozen, isNight, isRunning, myBids, participantsOf, roomCfg, visibleStatuses } from '../engine/game';
 import type { BidStatus } from '../engine/types';
 import { fmtAgo, fmtClock, fmtVnd, randInt } from '../engine/util';
@@ -39,6 +39,15 @@ export function Room({ roomId }: { roomId: string }) {
   const price = snapPrice(parseInt(priceText, 10) || 0, rule);
   const [err, setErr] = useState('');
   const [flash, setFlash] = useState('');
+  // Đồng hồ nổi khi đóng băng: hiện khi vòng đếm lớn trên đầu bị cuộn khuất
+  const scRef = useRef<HTMLDivElement>(null);
+  const ringRef = useRef<HTMLDivElement>(null);
+  const [ringHidden, setRingHidden] = useState(false);
+  const checkRing = () => {
+    const r = ringRef.current?.getBoundingClientRect();
+    const sc = scRef.current?.getBoundingClientRect();
+    setRingHidden(!!r && !!sc && r.bottom < sc.top + 60);
+  };
 
   // nhận giá được chọn từ Soi vùng giá
   useEffect(() => {
@@ -59,6 +68,22 @@ export function Room({ roomId }: { roomId: string }) {
     const t = window.setTimeout(() => setFlash(''), 1800);
     return () => window.clearTimeout(t);
   }, [flash]);
+
+  const sNow = s && Date.now();
+  const frozenNow = !!s && isFrozen(s, sNow as number);
+  const secLeft = s ? Math.ceil((s.endAt - (sNow as number)) / 1000) : 0;
+  useEffect(() => {
+    checkRing();
+    // 5 giây cuối: rung nhẹ mỗi giây cho cảm giác gấp gáp
+    if (frozenNow && secLeft > 0 && secLeft <= 5) {
+      try {
+        navigator.vibrate?.(secLeft <= 2 ? 70 : 35);
+      } catch {
+        /* không hỗ trợ rung */
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frozenNow, secLeft]);
 
   if (!s) {
     return (
@@ -100,7 +125,9 @@ export function Room({ roomId }: { roomId: string }) {
       const card = document.getElementById('bid-card');
       const sc = card?.closest('.scroll') as HTMLElement | null;
       if (!card || !sc) return;
-      const top = card.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - 12;
+      // Đang đóng băng: chừa chỗ cho đồng hồ nổi phía trên để không che ô nhập giá
+      const gap = sc.classList.contains('frozen') ? 84 : 12;
+      const top = card.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - gap;
       sc.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
     }, delay);
   };
@@ -138,7 +165,8 @@ export function Room({ roomId }: { roomId: string }) {
           : '';
 
   return (
-    <div className={`scroll room ${frozen ? 'frozen' : night ? 'night' : ''}`}>
+    <>
+    <div ref={scRef} onScroll={checkRing} className={`scroll room ${frozen ? 'frozen' : night ? 'night' : ''}`}>
       {/* ---------- Header ---------- */}
       <header className="hdr" style={frozen ? { borderRadius: 0 } : undefined}>
         <div className="hdr-row">
@@ -167,7 +195,7 @@ export function Room({ roomId }: { roomId: string }) {
         </div>
 
         {frozen ? (
-          <div style={{ position: 'relative', height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div ref={ringRef} style={{ position: 'relative', height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="210" height="210" viewBox="0 0 240 240" aria-hidden="true">
               <circle cx="120" cy="120" r="104" fill="none" stroke="rgba(255,246,224,0.12)" strokeWidth="14" />
               <circle
@@ -446,5 +474,29 @@ export function Room({ roomId }: { roomId: string }) {
       {/* chừa chỗ để khung Ra giá luôn cuộn được lên đầu màn hình */}
       <div aria-hidden="true" style={{ height: '30vh' }} />
     </div>
+
+    {/* ---------- Đóng băng: đồng hồ nổi bám đầu màn hình + viền đỏ nhấp nháy ---------- */}
+    {frozen && remaining <= 10000 && <div className={`urgent-vignette ${remaining <= 5000 ? 'hard' : ''}`} aria-hidden="true" />}
+    {frozen && ringHidden && (
+      <button
+        className={`float-clock ${remaining <= 10000 ? 'hot' : ''} ${remaining <= 5000 ? 'critical' : ''}`}
+        onClick={() => scRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
+        aria-label={`Búa sắp gõ, còn ${fmtClock(remaining)}. Bấm để xem đồng hồ lớn`}
+      >
+        <span className="fc-gavel" aria-hidden="true">
+          <IcGavel size={20} color="#FFF6E0" />
+        </span>
+        <span className="col" style={{ alignItems: 'flex-start', gap: 0 }}>
+          <span className="fc-label">BÚA SẮP GÕ</span>
+          <span className="display fc-time" key={secLeft} role="timer">
+            {fmtClock(remaining)}
+          </span>
+        </span>
+        <span className="fc-bar" aria-hidden="true">
+          <span style={{ width: `${Math.max(0, Math.min(100, (remaining / freezeTotal) * 100))}%` }} />
+        </span>
+      </button>
+    )}
+    </>
   );
 }
